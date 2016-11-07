@@ -1,6 +1,7 @@
 package WTSI::NPG::OM::BioNano::BnxFile;
 
 use Moose;
+use namespace::autoclean;
 
 use Digest::MD5;
 

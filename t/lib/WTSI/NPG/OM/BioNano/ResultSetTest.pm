@@ -71,7 +71,14 @@ sub construction : Test(11) {
     is($resultset->sample, 'sample_barcode_01234',
        'Found expected sample barcode');
 
-    is($resultset->run_date, '2016-10-04T09:00:00',
+    my $dt = DateTime->new(
+        year   => 2016,
+        month  => 10,
+        day    => 4,
+        hour   => 9,
+        minute => 0,
+    );
+    is(DateTime->compare($resultset->run_date, $dt), 0,
        'Found expected run date');
 
     my $tmp = tempdir("BioNanoResultSetTest_XXXXXX", CLEANUP => 1);

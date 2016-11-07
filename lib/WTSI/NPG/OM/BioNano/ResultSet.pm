@@ -1,6 +1,7 @@
 package WTSI::NPG::OM::BioNano::ResultSet;
 
 use Moose;
+use namespace::autoclean;
 
 use Cwd qw[abs_path];
 use DateTime;
@@ -61,7 +62,7 @@ has 'raw_bnx_path' =>
 
 has 'run_date' =>
   (is       => 'ro',
-   isa      => 'Str',
+   isa      => 'DateTime',
    lazy     => 1,
    builder  => '_build_run_date',
    init_arg => undef,
@@ -180,8 +181,7 @@ sub _build_run_date {
     # parse the datestamp from main directory name
     my ($self) = @_;
     my ($barcode, $datetime) = $self->_parse_runfolder_name();
-    my $time_string = $datetime->strftime('%Y-%m-%dT%H:%M:%S');
-    return $time_string;
+    return $datetime;
 }
 
 sub _build_sample {

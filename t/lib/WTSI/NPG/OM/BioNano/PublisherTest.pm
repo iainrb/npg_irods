@@ -11,7 +11,7 @@ use Test::More tests => 7;
 use Test::Exception;
 
 use English qw[-no_match_vars];
-use File::Spec;
+use File::Spec::Functions;
 use File::Temp qw[tempdir];
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -33,7 +33,8 @@ my $log = Log::Log4perl->get_logger();
 sub make_fixture : Test(setup) {
     # set up iRODS test collection
     my $irods = WTSI::NPG::iRODS->new;
-    $irods_tmp_coll = "BioNanoPublisherTest.$pid";
+    my $irods_cwd = $irods->working_collection;
+    $irods_tmp_coll = catfile($irods_cwd, "BioNanoPublisherTest.$pid");
     $irods->add_collection($irods_tmp_coll);
     # create a temporary directory for test data
     # workaround for the space in BioNano's "Detect Molecules" directory,
@@ -87,11 +88,9 @@ sub metadata : Test(4) {
         hour       => 12,
         minute     => 00,
     );
-    my $user_name = 'jbancarz';
-    my $affiliation_uri = URI->new('http://www.bancarz.com');
+    my $user_name = getpwuid $REAL_USER_ID;
+    my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
     my $publisher = WTSI::NPG::OM::BioNano::Publisher->new(
-        affiliation_uri => $affiliation_uri,
-        accountee_uid => $user_name,
         resultset => $resultset
     );
     my $bionano_coll = $publisher->publish($irods_tmp_coll,
@@ -135,9 +134,9 @@ sub metadata : Test(4) {
     is_deeply(\@collection_meta, \@expected_meta,
               "Collection metadata matches expected values");
 
-    my $bnx_ipath =  File::Spec->catfile($bionano_coll,
-                                         'Detect Molecules',
-                                         'Molecules.bnx');
+    my $bnx_ipath = catfile($bionano_coll,
+                            'Detect Molecules',
+                            'Molecules.bnx');
     my @file_meta = $irods->get_object_meta($bnx_ipath);
 
     my @additional_file_meta = (
