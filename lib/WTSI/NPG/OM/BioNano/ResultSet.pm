@@ -2,9 +2,9 @@ package WTSI::NPG::OM::BioNano::ResultSet;
 
 use Moose;
 
-use Cwd qw(abs_path);
+use Cwd qw[abs_path];
 use DateTime;
-use File::Basename qw(fileparse);
+use File::Basename qw[fileparse];
 use File::Spec;
 
 use WTSI::DNAP::Utilities::Collector;
@@ -19,12 +19,12 @@ our $DATA_DIRECTORY_NAME = 'Detect Molecules';
 our $BNX_NAME_FILTERED = 'Molecules.bnx';
 our $BNX_NAME_RAW = 'RawMolecules.bnx';
 
-our @ANCILLARY_FILE_NAMES = qw(analysisLog.txt
+our @ANCILLARY_FILE_NAMES = qw[analysisLog.txt
                                analysisResult.json
                                iovars.json
                                RunReport.txt
                                Stitch.fov
-                               workset.json);
+                               workset.json];
 
 has 'directory' =>
   (is       => 'ro',
@@ -99,20 +99,20 @@ sub BUILD {
     my ($self) = @_;
     # validate main directory
     if (! -e $self->directory) {
-        $self->logconfess(q{BioNano directory path '}, $self->directory,
-                          q{' does not exist});
+        $self->logconfess(q[BioNano directory path '], $self->directory,
+                          q[' does not exist]);
     }
     if (! -d $self->directory) {
-        $self->logconfess(q{BioNano directory path '}, $self->directory,
-                          q{' is not a directory});
+        $self->logconfess(q[BioNano directory path '], $self->directory,
+                          q[' is not a directory]);
     }
     # directory name must be of the form barcode_yyyy-mm-dd_HH_MM
     # barcode may include _ (underscore) characters, but not whitespace
     my $dirname = fileparse($self->directory);
     if (!($dirname =~ qr{^\S+_\d{4}-\d{2}-\d{2}_\d{2}_\d{2}$}msx)) {
-        $self->logcroak(q{Incorrectly formatted name '}, $dirname,
-                        q{' for BioNano unit runfolder: should be },
-                        q{of the form barcode_yyyy-mm-dd_HH_MM});
+        $self->logcroak(q[Incorrectly formatted name '], $dirname,
+                        q[' for BioNano unit runfolder: should be ],
+                        q[of the form barcode_yyyy-mm-dd_HH_MM]);
     }
     return 1;
 }
@@ -130,8 +130,8 @@ sub _build_ancillary_files {
     }
     foreach my $file (@files) {
         if (!$ancillary_file_names{fileparse($file)}) {
-            $self->logwarn(q{Unexpected ancillary file name for '},
-                           $file, q{'});
+            $self->logwarn(q[Unexpected ancillary file name for '],
+                           $file, q[']);
         }
         push @ancillary_files, $file;
         $self->debug('Added ', $file, ' to list of ancillary files');
@@ -144,12 +144,12 @@ sub _build_data_directory {
     my $data_directory = File::Spec->catfile($self->directory,
                                              $DATA_DIRECTORY_NAME);
     if (! -e $data_directory) {
-        $self->logconfess(q{BioNano data directory path '}, $data_directory,
-                          q{' does not exist});
+        $self->logconfess(q[BioNano data directory path '], $data_directory,
+                          q[' does not exist]);
     }
     if (! -d $data_directory) {
-        $self->logconfess(q{BioNano data directory path '}, $data_directory,
-                          q{' is not a directory"});
+        $self->logconfess(q[BioNano data directory path '], $data_directory,
+                          q[' is not a directory"]);
     }
     return $data_directory;
 }
@@ -159,8 +159,8 @@ sub _build_bnx_path {
     my $bnx_path = File::Spec->catfile($self->data_directory,
                                              $BNX_NAME_FILTERED);
     if (! -e $bnx_path) {
-        $self->logconfess(q{BioNano filtered bnx path '},
-                          $bnx_path, q{' does not exist});
+        $self->logconfess(q[BioNano filtered bnx path '],
+                          $bnx_path, q[' does not exist]);
     }
     return $bnx_path;
 }
@@ -170,8 +170,8 @@ sub _build_raw_bnx_path {
     my $bnx_path = File::Spec->catfile($self->data_directory,
                                              $BNX_NAME_RAW);
     if (! -e $bnx_path) {
-        $self->logconfess(q{BioNano raw bnx path '},
-                          $bnx_path, q{' does not exist});
+        $self->logconfess(q[BioNano raw bnx path '],
+                          $bnx_path, q[' does not exist]);
     }
     return $bnx_path;
 }

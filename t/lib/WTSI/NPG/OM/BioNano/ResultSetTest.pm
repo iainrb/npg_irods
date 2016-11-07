@@ -3,10 +3,10 @@ package WTSI::NPG::OM::BioNano::ResultSetTest;
 use strict;
 use warnings;
 
-use Cwd qw(abs_path);
-use File::Temp qw(tempdir);
+use Cwd qw[abs_path];
+use File::Temp qw[tempdir];
 
-use base qw(WTSI::NPG::HTS::Test); # FIXME better path for shared base
+use base qw[WTSI::NPG::HTS::Test]; # FIXME better path for shared base
 
 use Test::More tests => 12;
 use Test::Exception;
@@ -30,12 +30,12 @@ sub make_fixture : Test(setup) {
     my $tmp_data = tempdir('temp_bionano_data_XXXXXX', CLEANUP => 1);
     my $run_path = $data_path.$runfolder_name;
     system("cp -R $run_path $tmp_data") && $log->logcroak(
-        q{Failed to copy '}, $run_path, q{' to '}, $tmp_data, q{'});
+        q[Failed to copy '], $run_path, q[' to '], $tmp_data, q[']);
     $test_run_path = $tmp_data.'/'.$runfolder_name;
-    my $cmd = q{mv }.$test_run_path.q{/Detect_Molecules }.
-        $test_run_path.q{/Detect\ Molecules};
+    my $cmd = q[mv ].$test_run_path.q[/Detect_Molecules ].
+        $test_run_path.q[/Detect\ Molecules];
     system($cmd) && $log->logcroak(
-        q{Failed rename command '}, $cmd, q{'});
+        q[Failed rename command '], $cmd, q[']);
 }
 
 sub construction : Test(11) {

@@ -3,7 +3,7 @@ package WTSI::NPG::OM::BioNano::Publisher;
 use Moose;
 
 use DateTime;
-use File::Basename qw(basename);
+use File::Basename qw[basename];
 use File::Spec;
 use UUID;
 use URI;
@@ -20,9 +20,9 @@ use WTSI::NPG::OM::BioNano::ResultSet;
 
 our $VERSION = '';
 
-with qw/WTSI::DNAP::Utilities::Loggable
+with qw[WTSI::DNAP::Utilities::Loggable
         WTSI::NPG::Accountable
-        WTSI::NPG::OM::BioNano::Annotator/;
+        WTSI::NPG::OM::BioNano::Annotator];
 
 has 'accountee_uid' =>
   (is       => 'ro',
@@ -98,8 +98,8 @@ sub publish {
     my $hash_path =
         $self->irods->hash_path($self->resultset->bnx_path,
                                 $self->resultset->bnx_file->md5sum);
-    $self->debug(q{Found hashed path '}, $hash_path, q{' from checksum '},
-                 $self->resultset->bnx_file->md5sum, q{'});
+    $self->debug(q[Found hashed path '], $hash_path, q[' from checksum '],
+                 $self->resultset->bnx_file->md5sum, q[']);
     if (! defined $timestamp) {
         $timestamp = DateTime->now();
     }
@@ -108,13 +108,13 @@ sub publish {
                                            $publish_dest);
     }
     my $leaf_collection = File::Spec->catdir($publish_dest, $hash_path);
-    $self->debug(q{Publishing to collection '}, $leaf_collection, q{'});
+    $self->debug(q[Publishing to collection '], $leaf_collection, q[']);
     # publish data to iRODS, if not already present
     my $dirname = basename($self->resultset->directory);
     my $bionano_collection = File::Spec->catdir($leaf_collection, $dirname);
     if ($self->irods->list_collection($bionano_collection)) {
-        $self->info(q{Skipping publication of BioNano data collection '},
-                $bionano_collection, q{': already exists});
+        $self->info(q[Skipping publication of BioNano data collection '],
+                $bionano_collection, q[': already exists]);
     } else {
         my $collection_meta = $self->make_collection_meta();
         my %publish_args = (
@@ -135,21 +135,21 @@ sub publish {
             $timestamp,
         );
         if ($bionano_published_coll ne $bionano_collection) {
-            $self->logcroak(q{Expected BioNano publication destination '},
+            $self->logcroak(q[Expected BioNano publication destination '],
                             $bionano_collection,
-                            q{' not equal to return value from Publisher '},
-                            $bionano_published_coll, q{'}
+                            q[' not equal to return value from Publisher '],
+                            $bionano_published_coll, q[']
                         );
         } else {
-            $self->debug(q{Published BioNano runfolder '},
+            $self->debug(q[Published BioNano runfolder '],
                          $self->resultset->directory,
-                         q{' to iRODS destination '},
-                         $bionano_collection, q{'}
+                         q[' to iRODS destination '],
+                         $bionano_collection, q[']
                      );
         }
         my $bnx_ipath = $self->_apply_bnx_file_metadata($bionano_collection);
-        $self->debug(q{Applied metadata to BNX iRODS object '},
-                     $bnx_ipath, q{'});
+        $self->debug(q[Applied metadata to BNX iRODS object '],
+                     $bnx_ipath, q[']);
     }
     return $bionano_collection;
 }
