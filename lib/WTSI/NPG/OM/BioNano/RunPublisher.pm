@@ -27,6 +27,13 @@ with qw[WTSI::DNAP::Utilities::Loggable
         WTSI::NPG::Accountable
         WTSI::NPG::OM::BioNano::Annotator];
 
+has 'directory' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   documentation => 'Path of a BioNano runfolder to be published'
+);
+
 has 'irods' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::iRODS',
@@ -38,7 +45,11 @@ has 'irods' =>
 has 'resultset' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::OM::BioNano::ResultSet',
-   required => 1);
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_resultset',
+   documentation => 'Object containing results from a BioNano runfolder'
+);
 
 has 'uuid' =>
   (is       => 'ro',
@@ -161,8 +172,16 @@ sub _apply_bnx_file_metadata {
     return $bnx_ipath;
 }
 
+sub _build_resultset {
+    my ($self,) = @_;
+    my $resultset = WTSI::NPG::OM::BioNano::ResultSet->new(
+        directory => $self->directory
+    );
+    return $resultset;
+}
+
 sub _build_uuid {
-    my (@self) = @_;
+    my ($self,) = @_;
     my $uuid_bin;
     my $uuid_str;
     UUID::generate($uuid_bin);
