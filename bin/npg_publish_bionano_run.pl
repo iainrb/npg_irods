@@ -11,7 +11,7 @@ use Pod::Usage;
 use Try::Tiny;
 use WTSI::DNAP::Utilities::Collector;
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
-use WTSI::NPG::OM::BioNano::Publisher;
+use WTSI::NPG::OM::BioNano::RunPublisher;
 use WTSI::NPG::OM::BioNano::ResultSet;
 
 our $VERSION = '';
@@ -92,7 +92,7 @@ sub run {
             my $resultset = WTSI::NPG::OM::BioNano::ResultSet->new(
                 directory => $dir,
             );
-            my $publisher = WTSI::NPG::OM::BioNano::Publisher->new(
+            my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
                 resultset => $resultset,
             );
             my $dest_collection = $publisher->publish($publish_dest);

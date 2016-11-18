@@ -1,4 +1,4 @@
-package WTSI::NPG::OM::BioNano::PublisherTest;
+package WTSI::NPG::OM::BioNano::RunPublisherTest;
 
 use strict;
 use warnings;
@@ -16,10 +16,10 @@ use File::Temp qw[tempdir];
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::OM::BioNano::Publisher'); }
+BEGIN { use_ok('WTSI::NPG::OM::BioNano::RunPublisher'); }
 
 use WTSI::NPG::iRODS;
-use WTSI::NPG::OM::BioNano::Publisher;
+use WTSI::NPG::OM::BioNano::RunPublisher;
 use WTSI::NPG::OM::BioNano::ResultSet;
 
 my $data_path = './t/data/bionano/';
@@ -35,7 +35,7 @@ sub make_fixture : Test(setup) {
     # set up iRODS test collection
     my $irods = WTSI::NPG::iRODS->new;
     my $irods_cwd = $irods->working_collection;
-    $irods_tmp_coll = catfile($irods_cwd, "BioNanoPublisherTest.$pid");
+    $irods_tmp_coll = catfile($irods_cwd, "BioNanoRunPublisherTest.$pid");
     $irods->add_collection($irods_tmp_coll);
     # create a temporary directory for test data
     # workaround for the space in BioNano's "Detect Molecules" directory,
@@ -63,11 +63,11 @@ sub publish : Test(2) {
         directory => $test_run_path,
     );
     my $publication_time = DateTime->now;
-    my $publisher = WTSI::NPG::OM::BioNano::Publisher->new(
+    my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         resultset => $resultset,
         publication_time => $publication_time,
     );
-    ok($publisher, "BioNano Publisher object created");
+    ok($publisher, "BioNano RunPublisher object created");
 
     my $run_collection;
     lives_ok(
@@ -90,7 +90,7 @@ sub metadata : Test(4) {
     );
     my $user_name = getpwuid $REAL_USER_ID;
     my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
-    my $publisher = WTSI::NPG::OM::BioNano::Publisher->new(
+    my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         resultset => $resultset
     );
     my $bionano_coll = $publisher->publish($irods_tmp_coll,
