@@ -127,10 +127,12 @@ Options:
   --days-ago
   --days_ago        The number of days ago that the publication window
                     ends. Optional, defaults to zero (the current day).
+                    Has no effect if the --runfolder_path option is used.
   --days            The number of days in the publication window, ending
                     at the day given by the --days-ago argument. Any sample
                     data modified during this period will be considered
                     for publication. Optional, defaults to 7 days.
+                    Has no effect if the --runfolder_path option is used.
   --collection      The data destination root collection in iRODS.
   --help            Display help.
   --logconf         A log4perl configuration file. Optional.
@@ -140,9 +142,11 @@ Options:
                     nor --search_dir is given, the default value of
                     --search_dir is used.
   --search-dir
-  --search_dir      The root directory to search for BioNano data.
-                    Incompatible with --runfolder_path. Optional, defaults
-                    to current working directory.
+  --search_dir      The root directory to search for BioNano data. The
+                    --days_ago and --days options determine a time window
+                    for runfolders to be published. Incompatible with
+                    --runfolder_path. Optional, defaults to current working
+                    directory.
   --verbose         Print messages while processing. Optional.
 
 =head1 DESCRIPTION
