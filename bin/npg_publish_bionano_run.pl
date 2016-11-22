@@ -2,6 +2,8 @@
 
 use strict;
 use warnings;
+use FindBin qw[$Bin];
+use lib (-d "$Bin/../lib/perl5" ? "$Bin/../lib/perl5" : "$Bin/../lib");
 
 use Cwd qw(cwd abs_path);
 use DateTime;
@@ -17,7 +19,11 @@ our $VERSION = '';
 our $BIONANO_REGEX = qr{^\S+_\d{4}-\d{2}-\d{2}_\d{2}_\d{2}$}msx;
 our $DEFAULT_DAYS = 7;
 
-if (! caller ) { run(); }
+if (! caller ) {
+    my $result = run();
+    if ($result == 0) { exit 1; }
+    else { exit 0; }
+}
 sub run {
 
     my $days;
@@ -93,6 +99,7 @@ sub run {
     }
     my $total = scalar @dirs;
     my $num_published = 0;
+    my $errors = 0;
     $log->debug(q[Ready to publish ], $total, q[ BioNano runfolder(s) to '],
                 $collection, q[']);
     foreach my $dir (@dirs) {
@@ -106,12 +113,21 @@ sub run {
                        q[' to iRODS collection '], $dest_collection,
                        q[': ], $num_published, q[ of ], $total);
         } catch {
-            $log->error("Failed to publish '$dir': ", $_);
+            $log->error("Error publishing '$dir': ", $_);
+            $errors++;
         };
     }
-    $log->info("Finished; published $num_published runs of $total input");
-
-    return 1;
+    my $status = 1;
+    if ($errors == 0) {
+        $log->info(q[Finished successfully: Published ],
+                   $total, q[ BioNano run(s)]);
+    } else {
+        $log->error(q[Finished with errors: Attempted to publish ], $total,
+                    q[ BioNano run(s); ], $num_published, q[ succeeded, ],
+                    $errors, q[ failed]);
+        $status = 0;
+    }
+    return $status;
 }
 
 __END__

@@ -7,7 +7,7 @@ use URI;
 
 use base qw[WTSI::NPG::HTS::Test]; # FIXME better path for shared base
 
-use Test::More tests => 15;
+use Test::More tests => 17;
 use Test::Exception;
 
 use English qw[-no_match_vars];
@@ -151,7 +151,7 @@ sub metadata : Test(4) {
               'BNX file metadata matches expected values');
 }
 
-sub script : Test(8) {
+sub script : Test(10) {
 
     my $irods = WTSI::NPG::iRODS->new();
 
@@ -178,6 +178,13 @@ sub script : Test(8) {
     $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data ".
         "--runfolder_path $test_run_path 2> /dev/null";
     ok(system($cmd)!=0, "Publish script fails with incompatible arguments");
+    ok(! $irods->is_collection($expected_coll),
+       "No iRODS collection published by failed script");
+
+    $cmd = "$script --collection $irods_tmp_coll --runfolder_path ".
+        "$tmp_data/foo/bar 2> /dev/null";
+    ok(system($cmd)!=0, "Publish script has non-zero exit status for ".
+           "nonexistent input");
     ok(! $irods->is_collection($expected_coll),
        "No iRODS collection published by failed script");
 
