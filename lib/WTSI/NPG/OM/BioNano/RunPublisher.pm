@@ -145,7 +145,6 @@ sub make_collection_meta {
     # creation metadata is added by HTS::Publisher
     my $primary_meta = $self->make_primary_metadata(
         $self->resultset,
-        $self->uuid,
     );
     my $secondary_meta = $self->make_secondary_metadata(
         $self->mlwh_schema,
