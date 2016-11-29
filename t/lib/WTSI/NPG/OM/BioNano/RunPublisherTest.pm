@@ -16,17 +16,26 @@ use File::Temp qw[tempdir];
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
+{
+  package TestDBFactory;
+  use Moose;
+
+  with 'npg_testing::db';
+}
+
 BEGIN { use_ok('WTSI::NPG::OM::BioNano::RunPublisher'); }
 
 use WTSI::NPG::iRODS;
 use WTSI::NPG::OM::BioNano::RunPublisher;
 
-my $data_path = './t/data/bionano/';
+my $data_path = './t/data/bionano';
 my $runfolder_name = 'sample_barcode_01234_2016-10-04_09_00';
+my $fixture_path = "t/fixtures";
 my $tmp_data;
 my $test_run_path;
 my $irods_tmp_coll;
 my $pid = $$;
+my $wh_schema;
 
 my $log = Log::Log4perl->get_logger();
 
@@ -36,11 +45,18 @@ sub make_fixture : Test(setup) {
     my $irods_cwd = $irods->working_collection;
     $irods_tmp_coll = catfile($irods_cwd, "BioNanoRunPublisherTest.$pid");
     $irods->add_collection($irods_tmp_coll);
+    # set up test database
+    # using the default temporary SQLite file created by npg_testing::db
+    my $dbfactory = TestDBFactory->new(sqlite_utf8_enabled => 1,
+                                       verbose             => 0);
+    $wh_schema = $dbfactory->create_test_db('WTSI::DNAP::Warehouse::Schema',
+                                            "$fixture_path/ml_warehouse",
+                                            );
     # create a temporary directory for test data
     # workaround for the space in BioNano's "Detect Molecules" directory,
     # because Build.PL does not work well with spaces in filenames
     $tmp_data = tempdir('temp_bionano_data_XXXXXX', CLEANUP => 1);
-    my $run_path = $data_path.$runfolder_name;
+    my $run_path = $data_path.'/'.$runfolder_name;
     system("cp -R $run_path $tmp_data") && $log->logcroak(
         q[Failed to copy '], $run_path, q[' to '], $tmp_data, q[']);
     $test_run_path = $tmp_data.'/'.$runfolder_name;;
@@ -62,6 +78,7 @@ sub publish : Test(2) {
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         directory => $test_run_path,
         publication_time => $publication_time,
+        mlwh_schema => $wh_schema,
     );
     ok($publisher, "BioNano RunPublisher object created");
 
@@ -84,7 +101,8 @@ sub metadata : Test(4) {
     my $user_name = getpwuid $REAL_USER_ID;
     my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
-        directory => $test_run_path
+        directory => $test_run_path,
+        mlwh_schema => $wh_schema,
     );
     my $bionano_coll = $publisher->publish($irods_tmp_coll,
                                            $publication_time);
@@ -159,7 +177,7 @@ sub script : Test(10) {
         "Failed to recursively update access time for $test_run_path"
     );
 
-    my $script = "npg_publish_bionano_run.pl";
+    my $script = "npg_publish_bionano_run.pl --test_db";
 
     my $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data";
 

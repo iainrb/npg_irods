@@ -6,7 +6,6 @@ use namespace::autoclean;
 use DateTime;
 use File::Basename qw[basename];
 use File::Spec::Functions;
-#use UUID;
 use URI;
 
 use WTSI::DNAP::Warehouse::Schema;
@@ -54,9 +53,8 @@ has 'resultset' =>
 
 has 'mlwh_schema' =>
   (is            => 'ro',
-   isa           => 'Int', #'WTSI::DNAP::Warehouse::Schema', # FIXME
+   isa           => 'WTSI::DNAP::Warehouse::Schema',
    required      => 1,
-   default       => 1,
    documentation => 'A ML warehouse handle to obtain secondary metadata');
 
 #also has uuid attribute from WTSI::NPG::OM::BioNano::Annotator
