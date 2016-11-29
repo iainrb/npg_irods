@@ -43,7 +43,7 @@ sub run {
     my $collection;
     my $runfolder_path;
     my $search_dir;
-    my $test_db;
+    my $test_db; # use the test MLWH DB; for development only
     my $verbose;
 
     GetOptions(
