@@ -1,14 +1,22 @@
 package WTSI::NPG::OM::BioNano::Annotator;
 
 use DateTime;
-use UUID;
 use Moose::Role;
+use UUID;
 
 use WTSI::NPG::OM::Metadata;
 
 our $VERSION = '';
 
 with qw[WTSI::NPG::HTS::Annotator]; # TODO better location for "parent" role
+
+has 'uuid' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   lazy     => 1,
+   builder  => '_build_uuid',
+   documentation => 'UUID generated for the publication to iRODS');
 
 =head2 make_bnx_metadata
 
@@ -28,14 +36,58 @@ sub make_bnx_metadata {
         $self->make_avu($BIONANO_FLOWCELL, $bnx->flowcell),
         $self->make_avu($BIONANO_INSTRUMENT, $bnx->instrument),
     );
-    return @bnx_meta;
+    return \@bnx_meta;
+}
+
+
+=head2 make_primary_metadata
+
+  Arg [1]    : [WTSI::NPG::OM::BioNano::ResultSet] ResultSet object. Required.
+  Example    : @primary_meta = $publisher->get_primary_metadata($rs, $uuid);
+  Description: Generate primary metadata AVUs, to be applied
+               to a BioNano collection in iRODS.
+  Returntype : ArrayRef[HashRef] AVUs to be used as metadata
+
+=cut
+
+sub make_primary_metadata {
+    my ($self, $resultset) = @_;
+    if (! defined $resultset) {
+        $self->logcroak('BioNano ResultSet argument is required');
+    }
+    my @metadata;
+    push @metadata, @{$self->make_bnx_metadata($resultset)};
+    push @metadata, @{$self->make_uuid_metadata($self->uuid)};
+    return \@metadata;
+}
+
+
+=head2 make_secondary_metadata
+
+  Arg [1]    : db handle
+  Example    : @secondary_meta = $publisher->get_secondary_metadata($dbh);
+  Description: Generate secondary metadata AVUs, including sample and
+               study information from the ML Warehouse database, to be
+               applied to a BioNano collection in iRODS.
+  Returntype : ArrayRef[HashRef] AVUs to be used as metadata
+
+=cut
+
+sub make_secondary_metadata {
+    my ($self, $mlwh_schema) = @_;
+    if (! defined $mlwh_schema) {
+        $self->logcroak('ML Warehouse schema argument is required');
+    }
+    my @metadata;
+    # FIXME placeholder; need to add metadata terms
+    return \@metadata;
 }
 
 
 =head2 make_uuid_metadata
 
-  Arg [1]    : [Str] UUID string. Optional, defaults to generating new UUID.
-  Example    : @uuid_meta = $publisher->get_uuid_metadata($uuid);
+  Arg [1]    : None
+  Example    : @uuid_meta = $publisher->get_uuid_metadata();
   Description: Generate a UUID metadata AVU, to be applied
                to a BioNano collection in iRODS.
   Returntype : ArrayRef[HashRef] AVUs to be used as metadata
@@ -43,18 +95,22 @@ sub make_bnx_metadata {
 =cut
 
 sub make_uuid_metadata {
-    my ($self, $uuid_str) = @_;
-    if (! defined $uuid_str) {
-        my $uuid_bin;
-        UUID::generate($uuid_bin);
-        UUID::unparse($uuid_bin, $uuid_str);
-    }
+    my ($self) = @_;
     my @uuid_meta = (
-        $self->make_avu($BIONANO_UUID, $uuid_str),
+        $self->make_avu($BIONANO_UUID, $self->uuid),
     );
-    return @uuid_meta;
+    return \@uuid_meta;
 }
 
+
+sub _build_uuid {
+    my ($self,) = @_;
+    my $uuid_bin;
+    my $uuid_str;
+    UUID::generate($uuid_bin);
+    UUID::unparse($uuid_bin, $uuid_str);
+    return $uuid_str;
+}
 
 no Moose::Role;
 

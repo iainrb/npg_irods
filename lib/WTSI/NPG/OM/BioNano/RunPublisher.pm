@@ -6,9 +6,10 @@ use namespace::autoclean;
 use DateTime;
 use File::Basename qw[basename];
 use File::Spec::Functions;
-use UUID;
+#use UUID;
 use URI;
 
+use WTSI::DNAP::Warehouse::Schema;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::DataObject;
@@ -51,13 +52,14 @@ has 'resultset' =>
    documentation => 'Object containing results from a BioNano runfolder'
 );
 
-has 'uuid' =>
-  (is       => 'ro',
-   isa      => 'Str',
-   required => 1,
-   lazy     => 1,
-   builder  => '_build_uuid',
-   documentation => 'UUID generated for the publication to iRODS');
+has 'mlwh_schema' =>
+  (is            => 'ro',
+   isa           => 'Int', #'WTSI::DNAP::Warehouse::Schema', # FIXME
+   required      => 1,
+   default       => 1,
+   documentation => 'A ML warehouse handle to obtain secondary metadata');
+
+#also has uuid attribute from WTSI::NPG::OM::BioNano::Annotator
 
 
 =head2 publish
@@ -143,10 +145,14 @@ sub make_collection_meta {
     my ($self) = @_;
     my @metadata;
     # creation metadata is added by HTS::Publisher
-    my @bnx_meta = $self->make_bnx_metadata($self->resultset);
-    my @uuid_meta = $self->make_uuid_metadata($self->uuid);
-    push @metadata, @bnx_meta, @uuid_meta;
-    # TODO add sample metadata from Sequencescape (or mock DB for tests)
+    my $primary_meta = $self->make_primary_metadata(
+        $self->resultset,
+        $self->uuid,
+    );
+    my $secondary_meta = $self->make_secondary_metadata(
+        $self->mlwh_schema,
+    );
+    push @metadata, @{$primary_meta}, @{$secondary_meta};
     return \@metadata;
 }
 
@@ -178,15 +184,6 @@ sub _build_resultset {
         directory => $self->directory
     );
     return $resultset;
-}
-
-sub _build_uuid {
-    my ($self,) = @_;
-    my $uuid_bin;
-    my $uuid_str;
-    UUID::generate($uuid_bin);
-    UUID::unparse($uuid_bin, $uuid_str);
-    return $uuid_str;
 }
 
 
