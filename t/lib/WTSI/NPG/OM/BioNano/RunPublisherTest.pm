@@ -177,9 +177,10 @@ sub script : Test(10) {
         "Failed to recursively update access time for $test_run_path"
     );
 
-    my $script = "npg_publish_bionano_run.pl --test_db";
+    my $cmd_root = "npg_publish_bionano_run.pl --test_db ".
+        "--collection $irods_tmp_coll";
 
-    my $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data";
+    my $cmd = "$cmd_root --search_dir $tmp_data";
 
     ok(system($cmd)==0, "Publish script run successfully with search dir");
 
@@ -193,21 +194,19 @@ sub script : Test(10) {
 
     $irods->remove_collection($expected_coll);
 
-    $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data ".
+    $cmd = "$cmd_root --search_dir $tmp_data ".
         "--runfolder_path $test_run_path 2> /dev/null";
     ok(system($cmd)!=0, "Publish script fails with incompatible arguments");
     ok(! $irods->is_collection($expected_coll),
        "No iRODS collection published by failed script");
 
-    $cmd = "$script --collection $irods_tmp_coll --runfolder_path ".
-        "$tmp_data/foo/bar 2> /dev/null";
+    $cmd = "$cmd_root --runfolder_path $tmp_data/foo/bar 2> /dev/null";
     ok(system($cmd)!=0, "Publish script has non-zero exit status for ".
            "nonexistent input");
     ok(! $irods->is_collection($expected_coll),
        "No iRODS collection published by failed script");
 
-    $cmd = "$script --collection $irods_tmp_coll ".
-        "--runfolder_path $test_run_path";
+    $cmd = "$cmd_root --runfolder_path $test_run_path";
     ok(system($cmd)==0, "Publish script run successfully with runfolder");
     ok($irods->is_collection($expected_coll),
        "Script publishes to expected iRODS collection");
