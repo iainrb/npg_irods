@@ -32,6 +32,7 @@ my $data_path = './t/data/bionano';
 my $runfolder_name = 'sample_barcode_01234_2016-10-04_09_00';
 my $fixture_path = "t/fixtures";
 my $tmp_data;
+my $tmp_db;
 my $test_run_path;
 my $irods_tmp_coll;
 my $pid = $$;
@@ -39,19 +40,30 @@ my $wh_schema;
 
 my $log = Log::Log4perl->get_logger();
 
+
+sub setup_databases : Test(startup) {
+    $tmp_db = tempdir('temp_bionano_db_XXXXXX', CLEANUP => 1);
+    my $wh_db_file = catfile($tmp_db, 'ml_wh.db');
+    my $db_factory = TestDBFactory->new(
+        sqlite_utf8_enabled => 1,
+        verbose             => 0
+    );
+    $wh_schema = $db_factory->create_test_db(
+        'WTSI::DNAP::Warehouse::Schema',
+        "$fixture_path/ml_warehouse",
+    );
+}
+
+sub teardown_databases : Test(shutdown) {
+    $wh_schema->storage->disconnect;
+}
+
 sub make_fixture : Test(setup) {
     # set up iRODS test collection
     my $irods = WTSI::NPG::iRODS->new;
     my $irods_cwd = $irods->working_collection;
     $irods_tmp_coll = catfile($irods_cwd, "BioNanoRunPublisherTest.$pid");
     $irods->add_collection($irods_tmp_coll);
-    # set up test database
-    # using the default temporary SQLite file created by npg_testing::db
-    my $dbfactory = TestDBFactory->new(sqlite_utf8_enabled => 1,
-                                       verbose             => 0);
-    $wh_schema = $dbfactory->create_test_db('WTSI::DNAP::Warehouse::Schema',
-                                            "$fixture_path/ml_warehouse",
-                                            );
     # create a temporary directory for test data
     # workaround for the space in BioNano's "Detect Molecules" directory,
     # because Build.PL does not work well with spaces in filenames
