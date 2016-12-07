@@ -29,8 +29,7 @@ has 'uuid' =>
 =cut
 
 sub make_bnx_metadata {
-    my ($self, $resultset) = @_;
-    my $bnx = $resultset->bnx_file;
+    my ($self, $bnx) = @_;
     my @bnx_meta = (
         $self->make_avu($BIONANO_CHIP_ID, $bnx->chip_id),
         $self->make_avu($BIONANO_FLOWCELL, $bnx->flowcell),
@@ -42,8 +41,8 @@ sub make_bnx_metadata {
 
 =head2 make_primary_metadata
 
-  Arg [1]    : [WTSI::NPG::OM::BioNano::ResultSet] ResultSet object. Required.
-  Example    : @primary_meta = $publisher->get_primary_metadata($rs, $uuid);
+  Arg [1]    : WTSI::NPG::OM::BioNano::BnxFile. Required.
+  Example    : @primary_meta = $publisher->get_primary_metadata($bnx, $uuid);
   Description: Generate primary metadata AVUs, to be applied
                to a BioNano collection in iRODS.
   Returntype : ArrayRef[HashRef] AVUs to be used as metadata
@@ -51,12 +50,12 @@ sub make_bnx_metadata {
 =cut
 
 sub make_primary_metadata {
-    my ($self, $resultset) = @_;
-    if (! defined $resultset) {
-        $self->logcroak('BioNano ResultSet argument is required');
+    my ($self, $bnx) = @_;
+    if (! defined $bnx) {
+        $self->logcroak('BnxFile argument is required');
     }
     my @metadata;
-    push @metadata, @{$self->make_bnx_metadata($resultset)};
+    push @metadata, @{$self->make_bnx_metadata($bnx)};
     push @metadata, @{$self->make_uuid_metadata($self->uuid)};
     return \@metadata;
 }

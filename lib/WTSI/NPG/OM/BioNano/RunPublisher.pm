@@ -144,7 +144,7 @@ sub make_collection_meta {
     my @metadata;
     # creation metadata is added by HTS::Publisher
     my $primary_meta = $self->make_primary_metadata(
-        $self->resultset,
+        $self->resultset->bnx_file,
     );
     my $secondary_meta = $self->make_secondary_metadata(
         $self->mlwh_schema,
