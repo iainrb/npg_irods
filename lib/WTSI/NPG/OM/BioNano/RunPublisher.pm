@@ -100,12 +100,18 @@ sub publish {
         $self->info(q[Skipping publication of BioNano data collection '],
                 $bionano_collection, q[': already exists]);
     } else {
-        my $collection_meta = $self->make_collection_meta();
+        my @stock_records = $self->_query_ml_warehouse(
+            $self->resultset->stock,
+        );
+        my @collection_meta = $self->make_collection_metadata(
+            $self->resultset->bnx_file,
+            @stock_records,
+        );
         my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
         my $bionano_published_coll = $publisher->publish(
             $self->resultset->directory,
             $leaf_collection,
-            $collection_meta,
+            \@collection_meta,
             $timestamp,
         );
         if ($bionano_published_coll ne $bionano_collection) {
@@ -127,32 +133,6 @@ sub publish {
     }
     return $bionano_collection;
 }
-
-
-=head2 make_collection_meta
-
-  Args       : None
-  Example    : $collection_meta = $publisher->get_collection_meta();
-  Description: Generate metadata to be applied to a BioNano collection
-               in iRODS.
-  Returntype : ArrayRef[HashRef] AVUs to be used as metadata
-
-=cut
-
-sub make_collection_meta {
-    my ($self) = @_;
-    my @metadata;
-    # creation metadata is added by HTS::Publisher
-    my $primary_meta = $self->make_primary_metadata(
-        $self->resultset->bnx_file,
-    );
-    my $secondary_meta = $self->make_secondary_metadata(
-        $self->mlwh_schema,
-    );
-    push @metadata, @{$primary_meta}, @{$secondary_meta};
-    return \@metadata;
-}
-
 
 sub _apply_bnx_file_metadata {
     my ($self, $bionano_collection) = @_;
@@ -181,6 +161,16 @@ sub _build_resultset {
         directory => $self->directory
     );
     return $resultset;
+}
+
+sub _query_ml_warehouse {
+    # query the BioNano warehouse to get BioNano StockResource results
+    # use these to get sample and study information
+    my ($self, $stock_id) = @_;
+    my @stock_records = $self->mlwh_schema->resultset('StockResource')->search
+        ({id_stock_resource_lims => $stock_id, },
+         {prefetch               => ['sample', 'study']});
+    return @stock_records;
 }
 
 

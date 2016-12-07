@@ -76,6 +76,56 @@ sub make_modification_metadata {
   return ($self->make_avu($DCTERMS_MODIFIED, $modification_time->iso8601));
 }
 
+=head2 make_study_metadata
+
+  Arg [1]    : DBIx::Class::Manual::ResultClass MLWH Study record
+  Example    : @study_meta = $p->make_secondary_metadata($study_record);
+  Description: Generate study metadata AVUs for use in iRODS.
+  Returntype : Array[HashRef] AVUs to be used as metadata
+
+=cut
+
+sub make_study_metadata {
+  my ($self, $study) = @_;
+
+  defined $study or
+    $self->logconfess('A defined study argument is required');
+
+  my $method_attr = {id_study_lims    => $STUDY_ID,
+                     accession_number => $STUDY_ACCESSION_NUMBER,
+                     name             => $STUDY_NAME,
+                     study_title      => $STUDY_TITLE};
+
+  return $self->_make_single_value_metadata($study, $method_attr);
+}
+
+=head2 make_sample_metadata
+
+  Arg [1]    : DBIx::Class::Manual::ResultClass MLWH Sample record
+  Example    : @sample_meta = $p->make_secondary_metadata($sample_record);
+  Description: Generate sample metadata AVUs for use in iRODS.
+  Returntype : Array[HashRef] AVUs to be used as metadata
+
+=cut
+
+sub make_sample_metadata {
+  my ($self, $sample) = @_;
+
+  defined $sample or
+    $self->logconfess('A defined sample argument is required');
+
+  my $method_attr = {accession_number => $SAMPLE_ACCESSION_NUMBER,
+                     id_sample_lims   => $SAMPLE_ID,
+                     name             => $SAMPLE_NAME,
+                     public_name      => $SAMPLE_PUBLIC_NAME,
+                     common_name      => $SAMPLE_COMMON_NAME,
+                     supplier_name    => $SAMPLE_SUPPLIER_NAME,
+                     cohort           => $SAMPLE_COHORT,
+                     donor_id         => $SAMPLE_DONOR_ID};
+
+  return $self->_make_single_value_metadata($sample, $method_attr);
+}
+
 =head2 make_type_metadata
 
   Arg [1]    : File name, Str.
@@ -154,6 +204,28 @@ sub make_ticket_metadata {
     $self->logconfess('A non-empty ticket_number argument is required');
 
   return ($self->make_avu($RT_TICKET, $ticket_number));
+}
+
+sub _make_single_value_metadata {
+  my ($self, $obj, $method_attr) = @_;
+  # The method_attr argument is a map of method name to attribute name
+  # under which the result will be stored.
+
+  my @avus;
+  foreach my $method_name (sort keys %{$method_attr}) {
+    my $attr  = $method_attr->{$method_name};
+    my $value = $obj->$method_name;
+
+    if (defined $value) {
+      $self->debug($obj, "::$method_name returned ", $value);
+      push @avus, $self->make_avu($attr, $value);
+    }
+    else {
+      $self->debug($obj, "::$method_name returned undef");
+    }
+  }
+
+  return @avus;
 }
 
 no Moose::Role;

@@ -8,6 +8,9 @@ use WTSI::NPG::OM::Metadata;
 
 our $VERSION = '';
 
+our $SOURCE            = 'source';
+our $PRODUCTION_SOURCE = 'production';
+
 with qw[WTSI::NPG::HTS::Annotator]; # TODO better location for "parent" role
 
 has 'uuid' =>
@@ -30,22 +33,47 @@ has 'uuid' =>
 
 sub make_bnx_metadata {
     my ($self, $bnx) = @_;
-    my @bnx_meta = (
+    my @avus = (
         $self->make_avu($BIONANO_CHIP_ID, $bnx->chip_id),
         $self->make_avu($BIONANO_FLOWCELL, $bnx->flowcell),
         $self->make_avu($BIONANO_INSTRUMENT, $bnx->instrument),
     );
-    return \@bnx_meta;
+    return @avus;
 }
 
+=head2 make_collection_metadata
+
+  Arg [1]    : WTSI::NPG::OM::BioNano::BnxFile. Required.
+  Arg [2]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
+  Example    : $coll_meta = $publisher->make_collection_metadata(@stock);
+  Description: Generate metadata to be applied to a BioNano collection
+               in iRODS.
+  Returntype : Array[HashRef] AVUs to be used as metadata
+
+=cut
+
+sub make_collection_metadata {
+    my ($self, $bnx_file, @stock_records) = @_;
+    my @avus;
+    # creation metadata is added by HTS::Publisher
+    my @primary_meta = $self->make_primary_metadata(
+        $bnx_file,
+    );
+    my @secondary_meta = $self->make_secondary_metadata(
+        $bnx_file,
+        @stock_records,
+    );
+    push @avus, @primary_meta, @secondary_meta;
+    return @avus;
+}
 
 =head2 make_primary_metadata
 
   Arg [1]    : WTSI::NPG::OM::BioNano::BnxFile. Required.
-  Example    : @primary_meta = $publisher->get_primary_metadata($bnx, $uuid);
+  Example    : @primary_meta = $publisher->make_primary_metadata($bnx);
   Description: Generate primary metadata AVUs, to be applied
                to a BioNano collection in iRODS.
-  Returntype : ArrayRef[HashRef] AVUs to be used as metadata
+  Returntype : Array[HashRef] AVUs to be used as metadata
 
 =cut
 
@@ -54,32 +82,34 @@ sub make_primary_metadata {
     if (! defined $bnx) {
         $self->logcroak('BnxFile argument is required');
     }
-    my @metadata;
-    push @metadata, @{$self->make_bnx_metadata($bnx)};
-    push @metadata, @{$self->make_uuid_metadata($self->uuid)};
-    return \@metadata;
+    my @avus;
+    push @avus, $self->make_bnx_metadata($bnx);
+    push @avus, @$self->make_uuid_metadata($self->uuid);
+    return @avus;
 }
 
 
 =head2 make_secondary_metadata
 
-  Arg [1]    : db handle
-  Example    : @secondary_meta = $publisher->get_secondary_metadata($dbh);
+  Arg [1]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
+  Example    : @secondary_meta = $p->make_secondary_metadata(@stock);
   Description: Generate secondary metadata AVUs, including sample and
                study information from the ML Warehouse database, to be
                applied to a BioNano collection in iRODS.
-  Returntype : ArrayRef[HashRef] AVUs to be used as metadata
+  Returntype : Array[HashRef] AVUs to be used as metadata
 
 =cut
 
 sub make_secondary_metadata {
-    my ($self, $mlwh_schema) = @_;
-    if (! defined $mlwh_schema) {
-        $self->logcroak('ML Warehouse schema argument is required');
+    my ($self, @stock_records) = @_;
+    my @avus;
+    push @avus, $self->make_avu($SOURCE, $PRODUCTION_SOURCE);
+    foreach my $stock_record (@stock_records) {
+        # TODO Stock record ID goes here
+        push @avus, $self->make_study_metadata($stock_record->study);
+        push @avus, $self->make_sample_metadata($stock_record->sample);
     }
-    my @metadata;
-    # FIXME placeholder; need to add metadata terms
-    return \@metadata;
+    return @avus;
 }
 
 
