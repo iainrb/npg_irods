@@ -29,7 +29,7 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::OM::BioNano::RunPublisher;
 
 my $data_path = './t/data/bionano';
-my $runfolder_name = 'sample_barcode_01234_2016-10-04_09_00';
+my $runfolder_name = 'stock_barcode_01234_2016-10-04_09_00';
 my $fixture_path = "t/fixtures";
 my $tmp_data;
 my $tmp_db;
