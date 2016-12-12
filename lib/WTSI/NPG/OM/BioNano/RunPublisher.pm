@@ -167,7 +167,8 @@ sub _query_ml_warehouse {
     my ($self,) = @_;
     my $stock_id = $self->resultset->stock;
     my @stock_records = $self->mlwh_schema->resultset('StockResource')->search
-        ({id_stock_resource_lims => $stock_id, });
+        ({id_stock_resource_lims => $stock_id, },
+         {prefetch                  => ['sample', 'study']});
     my $stock_total = scalar @stock_records;
     if ($stock_total == 0) {
         $self->logwarn('Did not find any results in ML Warehouse for ',
