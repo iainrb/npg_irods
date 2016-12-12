@@ -12,7 +12,7 @@ our @EXPORT = qw[
                  $BIONANO_CHIP_ID
                  $BIONANO_FLOWCELL
                  $BIONANO_INSTRUMENT
-                 $BIONANO_UUID
+                 $BIONANO_LIMS_ID
             ];
 
 ## use critic
@@ -24,7 +24,7 @@ our $VERSION = '';
 our $BIONANO_CHIP_ID    = 'bnx_chip_id';
 our $BIONANO_FLOWCELL   = 'bnx_flowcell';
 our $BIONANO_INSTRUMENT = 'bnx_instrument';
-our $BIONANO_UUID       = 'bnx_uuid';
+our $BIONANO_LIMS_ID    = 'bnx_lims_id';
 
 1;
 

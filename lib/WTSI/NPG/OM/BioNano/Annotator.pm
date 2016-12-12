@@ -8,6 +8,7 @@ use WTSI::NPG::OM::Metadata;
 
 our $VERSION = '';
 
+our $STOCK_IDENTIFIER  = 'stock_id';
 our $SOURCE            = 'source';
 our $PRODUCTION_SOURCE = 'production';
 
@@ -43,7 +44,7 @@ sub make_bnx_metadata {
 
 =head2 make_collection_metadata
 
-  Arg [1]    : WTSI::NPG::OM::BioNano::BnxFile. Required.
+  Arg [1]    : WTSI::NPG::OM::BioNano::ResultSet. Required.
   Arg [2]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
   Example    : $coll_meta = $publisher->make_collection_metadata(@stock);
   Description: Generate metadata to be applied to a BioNano collection
@@ -53,14 +54,17 @@ sub make_bnx_metadata {
 =cut
 
 sub make_collection_metadata {
-    my ($self, $bnx_file, @stock_records) = @_;
+    my ($self, $resultset, @stock_records) = @_;
     my @avus;
+    if (! defined $resultset) {
+        $self->logcroak("BioNano::ResultSet argument is required");
+    }
     # creation metadata is added by HTS::Publisher
     my @primary_meta = $self->make_primary_metadata(
-        $bnx_file,
+        $resultset->bnx_file,
     );
     my @secondary_meta = $self->make_secondary_metadata(
-        $bnx_file,
+        $resultset->stock,
         @stock_records,
     );
     push @avus, @primary_meta, @secondary_meta;
@@ -84,14 +88,16 @@ sub make_primary_metadata {
     }
     my @avus;
     push @avus, $self->make_bnx_metadata($bnx);
-    push @avus, @$self->make_uuid_metadata($self->uuid);
+    push @avus, $self->make_uuid_metadata($self->uuid);
     return @avus;
 }
 
 
 =head2 make_secondary_metadata
 
-  Arg [1]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
+  Arg [1]    : Str. Stock UUID parsed from the BioNano runfolder name.
+               Required.
+  Arg [2]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
   Example    : @secondary_meta = $p->make_secondary_metadata(@stock);
   Description: Generate secondary metadata AVUs, including sample and
                study information from the ML Warehouse database, to be
@@ -101,11 +107,14 @@ sub make_primary_metadata {
 =cut
 
 sub make_secondary_metadata {
-    my ($self, @stock_records) = @_;
+    my ($self, $stock_id, @stock_records) = @_;
+    if (! defined $stock_id ) {
+        $self->logcroak('Stock ID argument is required');
+    }
     my @avus;
     push @avus, $self->make_avu($SOURCE, $PRODUCTION_SOURCE);
+    push @avus, $self->make_avu($STOCK_IDENTIFIER, $stock_id);
     foreach my $stock_record (@stock_records) {
-        # TODO Stock record ID goes here
         push @avus, $self->make_study_metadata($stock_record->study);
         push @avus, $self->make_sample_metadata($stock_record->sample);
     }
@@ -125,10 +134,10 @@ sub make_secondary_metadata {
 
 sub make_uuid_metadata {
     my ($self) = @_;
-    my @uuid_meta = (
-        $self->make_avu($BIONANO_UUID, $self->uuid),
+    my @avus = (
+        $self->make_avu($BIONANO_LIMS_ID, $self->uuid),
     );
-    return \@uuid_meta;
+    return @avus;
 }
 
 

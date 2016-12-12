@@ -100,11 +100,9 @@ sub publish {
         $self->info(q[Skipping publication of BioNano data collection '],
                 $bionano_collection, q[': already exists]);
     } else {
-        my @stock_records = $self->_query_ml_warehouse(
-            $self->resultset->stock,
-        );
+        my @stock_records = $self->_query_ml_warehouse();
         my @collection_meta = $self->make_collection_metadata(
-            $self->resultset->bnx_file,
+            $self->resultset,
             @stock_records,
         );
         my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
@@ -166,10 +164,18 @@ sub _build_resultset {
 sub _query_ml_warehouse {
     # query the BioNano warehouse to get BioNano StockResource results
     # use these to get sample and study information
-    my ($self, $stock_id) = @_;
+    my ($self,) = @_;
+    my $stock_id = $self->resultset->stock;
     my @stock_records = $self->mlwh_schema->resultset('StockResource')->search
-        ({id_stock_resource_lims => $stock_id, },
-         {prefetch               => ['sample', 'study']});
+        ({id_stock_resource_lims => $stock_id, });
+    my $stock_total = scalar @stock_records;
+    if ($stock_total == 0) {
+        $self->logwarn('Did not find any results in ML Warehouse for ',
+                       q[stock ID '], $stock_id, q[']);
+    } else {
+        $self->info('Found ', $stock_total, ' result(s) in ML Warehouse ',
+                    q[for stock ID '], $stock_id, q[']);
+    }
     return @stock_records;
 }
 
