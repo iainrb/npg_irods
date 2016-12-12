@@ -137,7 +137,7 @@ sub metadata : Test(4) {
             'value' => 'B001'
         },
         {
-            'attribute' => 'bnx_lims_id',
+            'attribute' => 'bnx_uuid',
             'value' => $publisher->uuid
         },
         {
@@ -228,7 +228,7 @@ sub metadata : Test(4) {
             'value' => 'B001'
         },
         {
-            'attribute' => 'bnx_lims_id',
+            'attribute' => 'bnx_uuid',
             'value' => $publisher->uuid,
         },
         {

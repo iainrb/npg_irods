@@ -135,7 +135,7 @@ sub make_secondary_metadata {
 sub make_uuid_metadata {
     my ($self) = @_;
     my @avus = (
-        $self->make_avu($BIONANO_LIMS_ID, $self->uuid),
+        $self->make_avu($BIONANO_UUID, $self->uuid),
     );
     return @avus;
 }
