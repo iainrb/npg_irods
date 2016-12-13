@@ -55,7 +55,6 @@ lib/WTSI/NPG/OM/BioNano/Annotator.pm
 lib/WTSI/NPG/OM/BioNano/BnxFile.pm
 lib/WTSI/NPG/OM/BioNano/ResultSet.pm
 lib/WTSI/NPG/OM/BioNano/RunPublisher.pm
-lib/WTSI/NPG/OM/Metadata.pm
 LICENSE
 MANIFEST			This list of files
 META.json
