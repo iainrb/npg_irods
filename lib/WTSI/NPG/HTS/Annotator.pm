@@ -1,7 +1,7 @@
 package WTSI::NPG::HTS::Annotator;
 
-use Data::Dump qw[pp];
 use DateTime;
+use List::AllUtils qw[uniq];
 use Moose::Role;
 
 use WTSI::NPG::HTS::Metadata;
@@ -9,11 +9,13 @@ use WTSI::NPG::iRODS::Metadata;
 
 our $VERSION = '';
 
-our @GENERAL_PURPOSE_SUFFIXES = qw[bin csv h5 tgz tif tsv txt xls xlsx xml];
+our @COMPRESSION_SUFFIXES     = qw[bz2 gz xz zip];
+
+our @GENERAL_PURPOSE_SUFFIXES = qw[bin csv h5 tar tgz tif tsv txt xls xlsx xml];
 our @GENO_DATA_SUFFIXES       = qw[gtc idat];
 our @HTS_DATA_SUFFIXES        = qw[bam cram bai crai];
-our @HTS_ANCILLARY_SUFFIXES   = qw[bamcheck bed flagstat json seqchksum
-                                   stats xml];
+our @HTS_ANCILLARY_SUFFIXES   = qw[bam_stats bamcheck bed flagstat json
+                                   seqchksum stats xml];
 
 our @DEFAULT_FILE_SUFFIXES = (@GENERAL_PURPOSE_SUFFIXES,
                               @GENO_DATA_SUFFIXES,
@@ -24,6 +26,8 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::iRODS::Utilities
        ];
+
+my $COMPRESSION_PATTERN = join q[|], @COMPRESSION_SUFFIXES;
 
 # See http://dublincore.org/documents/dcmi-terms/
 
@@ -76,62 +80,13 @@ sub make_modification_metadata {
   return ($self->make_avu($DCTERMS_MODIFIED, $modification_time->iso8601));
 }
 
-=head2 make_study_metadata
-
-  Arg [1]    : DBIx::Class::Manual::ResultClass MLWH Study record
-  Example    : @study_meta = $p->make_secondary_metadata($study_record);
-  Description: Generate study metadata AVUs for use in iRODS.
-  Returntype : Array[HashRef] AVUs to be used as metadata
-
-=cut
-
-sub make_study_metadata {
-  my ($self, $study) = @_;
-
-  defined $study or
-    $self->logconfess('A defined study argument is required');
-
-  my $method_attr = {id_study_lims    => $STUDY_ID,
-                     accession_number => $STUDY_ACCESSION_NUMBER,
-                     name             => $STUDY_NAME,
-                     study_title      => $STUDY_TITLE};
-
-  return $self->_make_single_value_metadata($study, $method_attr);
-}
-
-=head2 make_sample_metadata
-
-  Arg [1]    : DBIx::Class::Manual::ResultClass MLWH Sample record
-  Example    : @sample_meta = $p->make_secondary_metadata($sample_record);
-  Description: Generate sample metadata AVUs for use in iRODS.
-  Returntype : Array[HashRef] AVUs to be used as metadata
-
-=cut
-
-sub make_sample_metadata {
-  my ($self, $sample) = @_;
-
-  defined $sample or
-    $self->logconfess('A defined sample argument is required');
-
-  my $method_attr = {accession_number => $SAMPLE_ACCESSION_NUMBER,
-                     id_sample_lims   => $SAMPLE_ID,
-                     name             => $SAMPLE_NAME,
-                     public_name      => $SAMPLE_PUBLIC_NAME,
-                     common_name      => $SAMPLE_COMMON_NAME,
-                     supplier_name    => $SAMPLE_SUPPLIER_NAME,
-                     cohort           => $SAMPLE_COHORT,
-                     donor_id         => $SAMPLE_DONOR_ID};
-
-  return $self->_make_single_value_metadata($sample, $method_attr);
-}
-
 =head2 make_type_metadata
 
   Arg [1]    : File name, Str.
-  Arg [2]    : Array of valid file suffix strings, Str. Optional
+  Arg [2]    : Array of valid file suffix strings (excluding and leading
+               dot), Str. Optional
 
-  Example    : my @avus = $ann->make_type_metadata($sample, '.txt', '.csv')
+  Example    : my @avus = $ann->make_type_metadata($sample, 'txt', 'csv')
   Description: Return an array of metadata AVUs describing the file 'type'
                (represented by its suffix).
   Returntype : Array[HashRef]
@@ -144,18 +99,20 @@ sub make_type_metadata {
   defined $file or $self->logconfess('A defined file argument is required');
   $file eq q[] and $self->logconfess('A non-empty file argument is required');
 
-  if (not @suffixes) {
-    @suffixes = @DEFAULT_FILE_SUFFIXES;
-  }
-  my $suffix_pattern = join q[|], @suffixes;
-  my $suffix_regex = qr{[.]($suffix_pattern)$}msx;
+  my @valid_suffixes = uniq (@DEFAULT_FILE_SUFFIXES, @suffixes);
+
+  my $suffix_pattern = join q[|], @valid_suffixes;
+  my $suffix_regex = qr{[.]  # Don't capture the suffix dot
+                        (
+                          ($suffix_pattern)
+                          ([.]($COMPRESSION_PATTERN))*
+                        )$}msx;
   my ($suffix) = $file =~ $suffix_regex;
 
   my @avus;
   if ($suffix) {
-    my ($base_suffix) = $suffix =~ m{^[.]?(.*)}msx;
-    $self->debug("Parsed base suffix of '$file' as '$base_suffix'");
-    push @avus, $self->make_avu($FILE_TYPE, $base_suffix);
+    $self->debug("Parsed base suffix of '$file' as '$suffix'");
+    push @avus, $self->make_avu($FILE_TYPE, $suffix);
   }
   else {
     $self->debug("Did not parse a suffix from '$file'");
@@ -204,28 +161,6 @@ sub make_ticket_metadata {
     $self->logconfess('A non-empty ticket_number argument is required');
 
   return ($self->make_avu($RT_TICKET, $ticket_number));
-}
-
-sub _make_single_value_metadata {
-  my ($self, $obj, $method_attr) = @_;
-  # The method_attr argument is a map of method name to attribute name
-  # under which the result will be stored.
-
-  my @avus;
-  foreach my $method_name (sort keys %{$method_attr}) {
-    my $attr  = $method_attr->{$method_name};
-    my $value = $obj->$method_name;
-
-    if (defined $value) {
-      $self->debug($obj, "::$method_name returned ", $value);
-      push @avus, $self->make_avu($attr, $value);
-    }
-    else {
-      $self->debug($obj, "::$method_name returned undef");
-    }
-  }
-
-  return @avus;
 }
 
 no Moose::Role;
