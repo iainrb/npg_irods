@@ -12,7 +12,7 @@ our $STOCK_IDENTIFIER  = 'stock_id';
 our $SOURCE            = 'source';
 our $PRODUCTION_SOURCE = 'production';
 
-with qw[WTSI::NPG::HTS::Annotator]; # TODO better location for "parent" role
+with qw[WTSI::NPG::iRODS::Annotator];
 
 has 'uuid' =>
   (is       => 'ro',
@@ -45,8 +45,9 @@ sub make_bnx_metadata {
 =head2 make_collection_metadata
 
   Arg [1]    : WTSI::NPG::OM::BioNano::ResultSet. Required.
-  Arg [2]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
-  Example    : $coll_meta = $publisher->make_collection_metadata(@stock);
+  Arg [2]    : Array[WTSI::DNAP::Warehouse::Schema::Result::StockResource]
+               ML warehouse Stock records
+  Example    : $coll_meta = $publisher->make_collection_metadata($rs, @stock);
   Description: Generate metadata to be applied to a BioNano collection
                in iRODS.
   Returntype : Array[HashRef] AVUs to be used as metadata
@@ -57,7 +58,11 @@ sub make_collection_metadata {
     my ($self, $resultset, @stock_records) = @_;
     my @avus;
     if (! defined $resultset) {
-        $self->logcroak("BioNano::ResultSet argument is required");
+        $self->logcroak('BioNano::ResultSet argument is required');
+    }
+    if (scalar @stock_records == 0) {
+        $self->logwarn('StockResource argument is empty; no sample/study ',
+                       'metadata will be added');
     }
     # creation metadata is added by HTS::Publisher
     my @primary_meta = $self->make_primary_metadata(
@@ -97,7 +102,8 @@ sub make_primary_metadata {
 
   Arg [1]    : Str. Stock UUID parsed from the BioNano runfolder name.
                Required.
-  Arg [2]    : Array[DBIx::Class::Manual::ResultClass] MLWH Stock records
+  Arg [2]    : Array[WTSI::DNAP::Warehouse::Schema::Result::StockResource]
+               ML warehouse Stock records
   Example    : @secondary_meta = $p->make_secondary_metadata(@stock);
   Description: Generate secondary metadata AVUs, including sample and
                study information from the ML Warehouse database, to be
@@ -114,10 +120,10 @@ sub make_secondary_metadata {
     my @avus;
     push @avus, $self->make_avu($SOURCE, $PRODUCTION_SOURCE);
     push @avus, $self->make_avu($STOCK_IDENTIFIER, $stock_id);
-    foreach my $stock_record (@stock_records) {
-        push @avus, $self->make_study_metadata($stock_record->study);
-        push @avus, $self->make_sample_metadata($stock_record->sample);
-    }
+    my @samples = map { $_->sample } @stock_records;
+    my @studies = map { $_->study } @stock_records;
+    push @avus, $self->make_sample_metadata(@samples);
+    push @avus, $self->make_study_metadata(@studies);
     return @avus;
 }
 
