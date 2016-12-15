@@ -86,15 +86,19 @@ done
 
 # iainrb Perl repo dependencies (not yet released on wtsi-npg, 2016-12-15)
 PERL_IRODS_WRAP_COMMIT=b721f6bf04ab8e91aa9c96a2c6c2d3ea8d3e99ef
+PERL_IRODS_WRAP_TEMP_VERSION=2.3.1
 ML_WAREHOUSE_COMMIT=c67a7e8ac3c427593bdd9b08eb4b57989c7d1c15
+ML_WAREHOUSE_TEMP_VERSION=2.6.1.1
 cd /tmp
 git clone https://github.com/iainrb/perl-irods-wrap.git perl-irods-wrap.git
 cd perl-irods-wrap.git
 git checkout $PERL_IRODS_WRAP_COMMIT
+git tag -a $PERL_IRODS_WRAP_TEMP_VERSION -m "Temporary version $PERL_IRODS_WRAP_TEMP_VERSION"
 cd /tmp
 git clone https://github.com/iainrb/ml_warehouse.git ml_warehouse.git
 cd ml_warehouse.git
 git checkout $ML_WAREHOUSE_COMMIT
+git tag -a $ML_WAREHOUSE_TEMP_VERSION -m "Temporary version $ML_WAREHOUSE_TEMP_VERSION"
 cd /tmp
 repos=$repos" /tmp/perl-irods-wrap.git /tmp/ml_warehouse.git"
 
