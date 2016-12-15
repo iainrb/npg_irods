@@ -74,7 +74,7 @@ cpanm --quiet --notest Module::Build
 
 # WTSI NPG Perl repo dependencies
 repos=""
-for repo in perl-dnap-utilities perl-irods-wrap ml_warehouse npg_ml_warehouse npg_tracking npg_seq_common npg_qc; do
+for repo in perl-dnap-utilities npg_ml_warehouse npg_tracking npg_seq_common npg_qc; do
     cd /tmp
     # Always clone master when using depth 1 to get current tag
     git clone --branch master --depth 1 ${WTSI_NPG_GITHUB_URL}/${repo}.git ${repo}.git
