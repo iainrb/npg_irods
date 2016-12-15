@@ -66,6 +66,12 @@ sudo ln -s /usr/local/bin/samtools /usr/local/bin/samtools_irods
 cpanm --quiet --notest Alien::Tidyp # For npg_tracking
 cpanm --quiet --notest Module::Build
 
+### Temporary changes to Travis config for unreleased dependencies
+
+# want to check out:
+# - perl-irods-wrap, ml_warehouse from specific iainrb commits
+# - others from wtsi-npg/master as normal
+
 # WTSI NPG Perl repo dependencies
 repos=""
 for repo in perl-dnap-utilities perl-irods-wrap ml_warehouse npg_ml_warehouse npg_tracking npg_seq_common npg_qc; do
@@ -77,6 +83,20 @@ for repo in perl-dnap-utilities perl-irods-wrap ml_warehouse npg_ml_warehouse np
     git ls-remote --heads --exit-code origin ${WTSI_NPG_BUILD_BRANCH} && git pull origin ${WTSI_NPG_BUILD_BRANCH} && echo "Switched to branch ${WTSI_NPG_BUILD_BRANCH}"
     repos=$repos" /tmp/${repo}.git"
 done
+
+# iainrb Perl repo dependencies (not yet released on wtsi-npg, 2016-12-15)
+PERL_IRODS_WRAP_COMMIT=b721f6bf04ab8e91aa9c96a2c6c2d3ea8d3e99ef
+ML_WAREHOUSE_COMMIT=c67a7e8ac3c427593bdd9b08eb4b57989c7d1c15
+cd /tmp
+git clone https://github.com/iainrb/perl-irods-wrap.git perl-irods-wrap.git
+cd perl-irods-wrap.git
+git checkout $PERL_IRODS_WRAP_COMMIT
+cd /tmp
+git clone https://github.com/iainrb/ml_warehouse.git ml_warehouse.git
+cd ml_warehouse.git
+git checkout $ML_WAREHOUSE_COMMIT
+cd /tmp
+repos=$repos" /tmp/perl-irods-wrap.git /tmp/ml_warehouse.git"
 
 # Install CPAN dependencies. The src libs are on PERL5LIB because of
 # circular dependencies. The blibs are on PERL5LIB because the package
