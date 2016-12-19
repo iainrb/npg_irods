@@ -85,8 +85,10 @@ for repo in perl-dnap-utilities npg_ml_warehouse npg_tracking npg_seq_common npg
 done
 
 # iainrb Perl repo dependencies (not yet released on wtsi-npg, 2016-12-15)
-git config user.email "ib5@sanger.ac.uk" # enables tagging
-git config user.name "Iain Bancarz"      # enables tagging
+#git config user.email "ib5@sanger.ac.uk" # enables tagging
+#git config user.name "Iain Bancarz"      # enables tagging
+export GIT_AUTHOR_NAME="Iain Bancarz"
+export GIT_AUTHOR_EMAIL="ib5@sanger.ac.uk"
 PERL_IRODS_WRAP_COMMIT=b721f6bf04ab8e91aa9c96a2c6c2d3ea8d3e99ef
 PERL_IRODS_WRAP_TEMP_VERSION=2.3.1
 ML_WAREHOUSE_COMMIT=c67a7e8ac3c427593bdd9b08eb4b57989c7d1c15
