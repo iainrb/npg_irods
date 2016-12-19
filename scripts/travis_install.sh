@@ -94,6 +94,8 @@ ML_WAREHOUSE_TEMP_VERSION=2.6.1.1
 cd /tmp
 git clone https://github.com/iainrb/perl-irods-wrap.git perl-irods-wrap.git
 cd perl-irods-wrap.git
+git config --get-all user.email
+git config --get-all user.name
 git checkout $PERL_IRODS_WRAP_COMMIT
 git tag -a $PERL_IRODS_WRAP_TEMP_VERSION -m "Temporary version $PERL_IRODS_WRAP_TEMP_VERSION"
 cd /tmp
