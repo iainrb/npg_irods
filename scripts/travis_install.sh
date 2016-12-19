@@ -86,7 +86,7 @@ done
 
 # iainrb Perl repo dependencies (not yet released on wtsi-npg, 2016-12-15)
 PERL_IRODS_WRAP_DEV_VERSION=2.6.2-dev0
-ML_WAREHOUSE_DEV_VERSION=2.4-dev0
+ML_WAREHOUSE_DEV_VERSION=2.4-dev1
 cd /tmp
 git clone https://github.com/iainrb/perl-irods-wrap.git perl-irods-wrap.git
 cd perl-irods-wrap.git
