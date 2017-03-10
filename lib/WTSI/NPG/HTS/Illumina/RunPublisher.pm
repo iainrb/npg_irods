@@ -83,16 +83,6 @@ has 'file_format' =>
    default       => 'cram',
    documentation => 'The format of the file to be published');
 
-has 'ancillary_formats' =>
-  (isa           => 'ArrayRef',
-   is            => 'ro',
-   required      => 1,
-   lazy          => 1,
-   default       => sub {
-     return [qw[bed bamcheck flagstat stats txt seqchksum]];
-   },
-   documentation => 'The ancillary file formats to be published');
-
 has 'dest_collection' =>
   (isa           => 'Str',
    is            => 'ro',
@@ -600,8 +590,9 @@ sub list_lane_ancillary_files {
   }
 
   my $positions_pattern = $self->_positions_pattern($pos);
+  # We do not want to include 
   my $suffix_pattern    = sprintf '(%s)',
-    join q[|], @{$self->ancillary_formats};
+    join q[|], grep { $_ ne 'json' } $self->hts_ancillary_suffixes;
   my $lane_file_pattern = sprintf '^%d_%s.*[.]%s$',
     $self->id_run, $positions_pattern, $suffix_pattern;
 
@@ -620,7 +611,7 @@ sub list_plex_ancillary_files {
   my $pos = $self->_check_position($position);
 
   my $suffix_pattern    = sprintf '(%s)',
-    join q[|], @{$self->ancillary_formats};
+    join q[|], grep { $_ ne 'json' } $self->hts_ancillary_suffixes;
   my $plex_file_pattern = sprintf '^%d_%d.*[.]%s$',
     $self->id_run, $pos, $suffix_pattern;
 
@@ -1382,7 +1373,8 @@ sub _build_obj_factory {
   my ($self) = @_;
 
   return WTSI::NPG::HTS::Illumina::DataObjectFactory->new
-    (irods => $self->irods);
+    (ancillary_formats => [$self->hts_ancillary_suffixes],
+     irods             => $self->irods);
 }
 
 sub _lane_qc_stats_file {
@@ -1476,11 +1468,12 @@ sub _make_obj {
 
   my ($filename, $directories, $suffix) = fileparse($file);
 
+  my $path = catfile($dest_coll, $filename);
   my $obj = $self->obj_factory->make_data_object
-    (catfile($dest_coll, $filename), id_run => $self->id_run);
+    ($path, id_run => $self->id_run);
 
   if (not $obj) {
-    $self->logconfess("Failed to parse and make an object from '$file'");
+    $self->logconfess("Failed to parse and make an object from '$path'");
   }
 
   return $obj;

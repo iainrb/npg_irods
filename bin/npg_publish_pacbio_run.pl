@@ -6,63 +6,51 @@ use FindBin qw[$Bin];
 use lib (-d "$Bin/../lib/perl5" ? "$Bin/../lib/perl5" : "$Bin/../lib");
 
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw[:levels];
 use Pod::Usage;
 
 use WTSI::DNAP::Warehouse::Schema;
+use WTSI::NPG::iRODS;
 use WTSI::NPG::HTS::PacBio::RunPublisher;
+use WTSI::NPG::HTS::PacBio::Sequel::RunPublisher;
 
 our $VERSION = '';
-
-my $verbose_config = << 'LOGCONF'
-log4perl.logger = ERROR, A1
-
-log4perl.logger.WTSI.NPG.HTS.PacBio = INFO, A1
-
-log4perl.appender.A1 = Log::Log4perl::Appender::Screen
-log4perl.appender.A1.layout = Log::Log4perl::Layout::PatternLayout
-log4perl.appender.A1.layout.ConversionPattern = %d %-5p %c - %m%n
-log4perl.appender.A1.utf8 = 1
-
-# Prevent duplicate messages with a non-Log4j-compliant Log4perl option
-log4perl.oneMessagePerAppender = 1
-LOGCONF
-;
 
 my $collection;
 my $debug;
 my $log4perl_config;
 my $runfolder_path;
 my $verbose;
+my $sequel;
 
-GetOptions('collection=s'                      => \$collection,
-           'debug'                             => \$debug,
-           'help'                              => sub {
+GetOptions('collection=s'                    => \$collection,
+           'debug'                           => \$debug,
+           'help'                            => sub {
              pod2usage(-verbose => 2, -exitval => 0);
            },
-           'logconf=s'                         => \$log4perl_config,
-           'runfolder-path|runfolder_path=s'   => \$runfolder_path,
-           'verbose'                           => \$verbose);
+           'sequel'                          => \$sequel,
+           'logconf=s'                       => \$log4perl_config,
+           'runfolder-path|runfolder_path=s' => \$runfolder_path,
+           'verbose'                         => \$verbose);
+
+
+
+my $module;
+if ($sequel) {
+  $module = 'WTSI::NPG::HTS::PacBio::Sequel::RunPublisher';
+} else {
+  $module = 'WTSI::NPG::HTS::PacBio::RunPublisher';
+}
 
 # Process CLI arguments
 if ($log4perl_config) {
   Log::Log4perl::init($log4perl_config);
 }
 else {
-  if ($verbose and not $debug) {
-    Log::Log4perl::init(\$verbose_config);
-  }
-  elsif ($debug) {
-    Log::Log4perl->easy_init({layout => '%d %-5p %c - %m%n',
-                              level  => $DEBUG,
-                              utf8   => 1})
-  }
-  else {
-    Log::Log4perl->easy_init({layout => '%d %-5p %c - %m%n',
-                              level  => $ERROR,
-                              utf8   => 1})
-  }
+  my $level = $debug ? $DEBUG : $verbose ? $INFO : $ERROR;
+  Log::Log4perl->easy_init({layout => '%d %-5p %c - %m%n',
+                            level  => $level,
+                            utf8   => 1});
 }
 
 if (not (defined $runfolder_path)) {
@@ -71,17 +59,18 @@ if (not (defined $runfolder_path)) {
             -exitval => 2);
 }
 
+
 my $irods     = WTSI::NPG::iRODS->new;
 my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
 
-my @pub_init_args = (irods          => $irods,
-                     mlwh_schema    => $wh_schema,
-                     runfolder_path => $runfolder_path);
+my @init_args = (irods          => $irods,
+                 mlwh_schema    => $wh_schema,
+                 runfolder_path => $runfolder_path);
 if ($collection) {
-  push @pub_init_args, dest_collection => $collection;
+  push @init_args, dest_collection => $collection;
 }
 
-my $publisher = WTSI::NPG::HTS::PacBio::RunPublisher->new(@pub_init_args);
+my $publisher = $module->new(@init_args);
 my ($num_files, $num_published, $num_errors) = $publisher->publish_files;
 
 my $log = Log::Log4perl->get_logger('main');
@@ -105,11 +94,11 @@ npg_publish_pacbio_run
 =head1 SYNOPSIS
 
 npg_publish_pacbio_run --runfolder-path <path> [--collection <path>]
-  [--debug] [--verbose] [--logconf <path>]
+   [--debug] [--verbose] [--logconf <path>] [--sequel]
 
  Options:
    --collection      The destination collection in iRODS. Optional,
-                     defaults to /seq/<id_run>/.
+                     defaults to /seq/pacbio/.
    --debug           Enable debug level logging. Optional, defaults to
                      false.
    --help            Display help.
@@ -117,6 +106,8 @@ npg_publish_pacbio_run --runfolder-path <path> [--collection <path>]
    --runfolder_path  The instrument runfolder path to load.
    --logconf         A log4perl configuration file. Optional.
    --verbose         Print messages while processing. Optional.
+   --sequel          If the run folder is output from a PacBio Sequel 
+                     system. Optional.
 
 =head1 DESCRIPTION
 
@@ -143,8 +134,7 @@ collection, the following take place:
    no files have been modified
 
 The default behaviour of the script is to publish all categories of
-file (metadata XML, bas/x.h5 and sts XML), for all available SMRT
-cells.
+file, for all available SMRT cells.
 
 =head1 AUTHOR
 

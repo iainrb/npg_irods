@@ -21,6 +21,7 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::PathLister
          WTSI::NPG::HTS::PacBio::Annotator
+         WTSI::NPG::HTS::PacBio::MetaQuery
        ];
 
 our $VERSION = '';
@@ -30,6 +31,10 @@ our $DEFAULT_ROOT_COLL    = '/seq/pacbio';
 
 # The default SMRT analysis results directory name
 our $ANALYSIS_DIR = 'Analysis_Results';
+
+# Well directory pattern
+our $WELL_DIRECTORY_PATTERN = '\d+_\d+$';
+
 
 has 'irods' =>
   (isa           => 'WTSI::NPG::iRODS',
@@ -51,11 +56,14 @@ has 'dest_collection' =>
    builder       => '_build_dest_collection',
    documentation => 'The destination collection within iRODS to store data');
 
-has 'mlwh_schema' =>
-  (is            => 'ro',
-   isa           => 'WTSI::DNAP::Warehouse::Schema',
-   required      => 1,
-   documentation => 'A ML warehouse handle to obtain secondary metadata');
+has 'directory_pattern' =>
+  (isa           => 'Str',
+   is            => 'ro',
+   init_arg      => undef,
+   lazy          => 1,
+   builder       => '_build_directory_pattern',
+   documentation => 'Well directory pattern');
+
 
 sub run_name {
   my ($self) = @_;
@@ -63,7 +71,7 @@ sub run_name {
   return first { $_ ne q[] } reverse splitdir($self->runfolder_path);
 }
 
-=head2 smrt_path
+=head2 smrt_names
 
   Arg [1]    : None
 
@@ -76,10 +84,9 @@ sub run_name {
 sub smrt_names {
   my ($self) = @_;
 
-  my $dir_pattern = '\d+_\d+$';
+  my $dir_pattern = $self->directory_pattern;
   my @dirs = grep { -d } $self->list_directory($self->runfolder_path,
                                                $dir_pattern);
-
   my @names = sort map { first { $_ ne q[] } reverse splitdir($_) } @dirs;
 
   return @names;
@@ -208,7 +215,7 @@ sub list_sts_xml_files {
   Arg [1]    : SMRT cell name, Str.
   Arg [2]    : Look index, Int. Optional.
 
-  Example    : $pub->list_smrt_xml_file('A01_1')
+  Example    : $pub->list_meta_xml_file('A01_1')
   Description: Return the path of the metadata XML file for the given SMRT
                cell.  Calling this method will access the file system.
   Returntype : Str
@@ -305,6 +312,11 @@ sub list_meta_xml_file {
       $num_errors    += ($nex + $neb + $nes);
     }
 
+    if ($num_errors > 0) {
+      $self->error("Encountered errors on $num_errors / ",
+                   "$num_processed files processed");
+    }
+
     return ($num_files, $num_processed, $num_errors);
   }
 }
@@ -336,7 +348,7 @@ sub publish_meta_xml_file {
     $self->_publish_files($files, $dest_coll);
 
   $self->info("Published $num_processed / $num_files metadata XML files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
@@ -361,26 +373,50 @@ sub publish_meta_xml_file {
 sub publish_basx_files {
   my ($self, $smrt_name, $look_index) = @_;
 
+  my $files     = $self->list_basx_files($smrt_name, $look_index);
+  my $dest_coll = catdir($self->dest_collection, $smrt_name, $ANALYSIS_DIR);
+
   my $metadata_file = $self->list_meta_xml_file($smrt_name, $look_index);
   $self->debug("Reading metadata from '$metadata_file'");
 
   my $metadata =
     WTSI::NPG::HTS::PacBio::MetaXMLParser->new->parse_file($metadata_file);
-  my @run_records = $self->_query_ml_warehouse($metadata->run_uuid,
-                                               $metadata->library_tube_uuids);
 
-  my @primary_avus   = $self->make_primary_metadata($metadata);
-  my @secondary_avus = $self->make_secondary_metadata($metadata, @run_records);
+  # There will be 1 record for a non-multiplexed SMRT cell and >1
+  # record for a multiplexed
+  my @run_records = $self->find_pacbio_runs($metadata->run_name,
+                                            $metadata->well_name);
 
-  my $files     = $self->list_basx_files($smrt_name, $look_index);
-  my $dest_coll = catdir($self->dest_collection, $smrt_name, $ANALYSIS_DIR);
+  # R & D runs have no records in the ML warehouse
+  my $is_r_and_d = @run_records ? 0 : 1;
 
-  my ($num_files, $num_processed, $num_errors) =
-    $self->_publish_files($files, $dest_coll,
-                          \@primary_avus, \@secondary_avus);
+  my ($num_files, $num_processed, $num_errors) = (0, 0, 0);
+
+  # A production well will always have run_uuid and records in ML
+  # warehouse. Production data are not published unless ML warehouse
+  # records are present.
+  if ($metadata->has_run_uuid && $is_r_and_d == 1) {
+    $self->error("Failed to publish $num_files bas/x files for run ",
+                 $metadata->run_name, ' well ', $metadata->well_name ,
+                 ' as data missing from ML warehouse');
+    $num_files = $num_processed = $num_errors = scalar @{$files};
+  }
+  else {
+    my @primary_avus   = $self->make_primary_metadata($metadata, $is_r_and_d);
+    my @secondary_avus = $self->make_secondary_metadata(@run_records);
+
+    # This call may be removed when the legacy metadata are no longer
+    # required
+    push @secondary_avus, $self->make_legacy_metadata(@run_records);
+
+    ($num_files, $num_processed, $num_errors) =
+      $self->_publish_files($files, $dest_coll,
+                            \@primary_avus, \@secondary_avus,
+                            [$self->make_avu($FILE_TYPE, 'bas')]);
+  }
 
   $self->info("Published $num_processed / $num_files bas/x files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
@@ -412,13 +448,15 @@ sub publish_sts_xml_files {
     $self->_publish_files($files, $dest_coll);
 
   $self->info("Published $num_processed / $num_files sts XML files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
 
+## no critic (Subroutines::ProhibitManyArgs)
 sub _publish_files {
-  my ($self, $files, $dest_coll, $primary_avus, $secondary_avus) = @_;
+  my ($self, $files, $dest_coll, $primary_avus, $secondary_avus,
+      $legacy_avus) = @_;
 
   defined $files or
     $self->logconfess('A defined files argument is required');
@@ -435,7 +473,9 @@ sub _publish_files {
   ref $secondary_avus eq 'ARRAY' or
     $self->logconfess('The secondary_avus argument must be an ArrayRef');
 
-  my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
+  my $reqcache  = []; ## no md5s precreated for PacBio
+  my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods,
+                                                 require_checksum_cache => $reqcache);
 
   my $num_files     = scalar @{$files};
   my $num_processed = 0;
@@ -453,16 +493,24 @@ sub _publish_files {
       $dest = $obj->str;
       $dest = $publisher->publish($file, $dest);
 
-       my ($num_pattr, $num_pproc, $num_perr) =
-         $obj->set_primary_metadata(@{$primary_avus});
-       my ($num_sattr, $num_sproc, $num_serr) =
-         $obj->update_secondary_metadata(@{$secondary_avus});
+      my ($num_pattr, $num_pproc, $num_perr) =
+        $obj->set_primary_metadata(@{$primary_avus});
+      my ($num_sattr, $num_sproc, $num_serr) =
+        $obj->update_secondary_metadata(@{$secondary_avus});
+
+      # This call may be removed when the legacy metadata are no longer
+      # required
+      my ($num_lattr, $num_lproc, $num_lerr) =
+        $self->_add_legacy_metadata($obj, $legacy_avus);
 
       if ($num_perr > 0) {
         $self->logcroak("Failed to set primary metadata cleanly on '$dest'");
       }
       if ($num_serr > 0) {
         $self->logcroak("Failed to set secondary metadata cleanly on '$dest'");
+      }
+      if ($num_lerr > 0) {
+        $self->logcroak("Failed to set legacy metadata cleanly on '$dest'");
       }
 
       $self->info("Published '$dest' [$num_processed / $num_files]");
@@ -474,12 +522,38 @@ sub _publish_files {
     };
   }
 
-  if ($num_errors > 0) {
-    $self->error("Encountered errors on $num_errors / ",
-                 "$num_processed files processed");
-  }
-
   return ($num_files, $num_processed, $num_errors);
+}
+## use critic
+
+# This method may be removed when the legacy metadata are no longer
+# required
+sub _add_legacy_metadata {
+  my ($self, $obj, $avus) = @_;
+
+  defined $obj or
+    $self->logconfess('A defined obj argument is required');
+
+  $avus ||= [];
+
+  ref $avus eq 'ARRAY' or
+    $self->logconfess('The avus argument must be an ArrayRef');
+
+  my $num_avus      = scalar @{$avus};
+  my $num_processed = 0;
+  my $num_errors    = 0;
+
+  try {
+    foreach my $avu (@{$avus}) {
+      $num_processed++;
+      $obj->add_avu($avu->{attribute}, $avu->{value}, $avu->{units});
+    }
+  } catch {
+    $num_errors++;
+    $self->error('Failed to add legacy avus ', pp($avus), q[: ], $_);
+  };
+
+  return ($num_avus, $num_processed, $num_errors);
 }
 
 sub _build_dest_collection  {
@@ -488,30 +562,25 @@ sub _build_dest_collection  {
   return catdir($DEFAULT_ROOT_COLL, $self->run_name);
 }
 
+
+sub _build_directory_pattern{
+   my ($self) = @_;
+
+   return $WELL_DIRECTORY_PATTERN;
+}
+
 # Check that a SMRT cell name argument is given and valid
 sub _check_smrt_name {
   my ($self, $smrt_name) = @_;
 
   defined $smrt_name or
-    $self->logconfess('A defined smart_name argument is required');
+    $self->logconfess('A defined smrt_name argument is required');
   any { $smrt_name eq $_ } $self->smrt_names or
     $self->logconfess("Invalid smrt_name argument '$smrt_name'");
 
   return $smrt_name;
 }
 
-# Look up PacBio run metadata in the ML warehouse using the library
-# tube UUID obtained from the run XML metadata.
-sub _query_ml_warehouse {
-  my ($self, $run_uuid, $library_tube_uuids) = @_;
-
-  my @run_records = $self->mlwh_schema->resultset('PacBioRun')->search
-    ({pac_bio_run_uuid          => $run_uuid,
-      pac_bio_library_tube_uuid => {'-in' => $library_tube_uuids}},
-     {prefetch                  => ['sample', 'study']});
-
-  return @run_records;
-}
 
 __PACKAGE__->meta->make_immutable;
 
@@ -527,6 +596,42 @@ WTSI::NPG::HTS::PacBio::RunPublisher
 
 =head1 DESCRIPTION
 
+Publishes metadata.xml, bax.h5, bas.h5 and sts.xml files to iRODS,
+adds metadata and sets permissions.
+
+An instance of RunPublisher is responsible for copying PacBio
+sequencing data from the instrument run folder to a collection in
+iRODS for a single, specific run.
+
+Data files are divided into three categories:
+
+ - basx files; HDF files of sequence data.
+ - meta XML files; run metadata.
+ - sts XML files; run metadata.
+
+A RunPublisher provides methods to list the complement of these
+categories and to copy ("publish") them. Each of these list or publish
+operations may be restricted to a specific SMRT cell and look index
+position.
+
+As part of the copying process, metadata are added to, or updated on,
+the files in iRODS. Following the metadata update, access permissions
+are set. The information to do both of these operations is provided by
+an instance of WTSI::DNAP::Warehouse::Schema.
+
+If a run is published multiple times to the same destination
+collection, the following take place:
+
+ - the RunPublisher checks local (run folder) file checksums against
+   remote (iRODS) checksums and will not make unnecessary updates
+
+ - if a local file has changed, the copy in iRODS will be overwritten
+   and additional metadata indicating the time of the update will be
+   added
+
+ - the RunPublisher will proceed to make metadata and permissions
+   changes to synchronise with the metadata supplied by
+   WTSI::DNAP::Warehouse::Schema, even if no files have been modified
 
 =head1 AUTHOR
 
