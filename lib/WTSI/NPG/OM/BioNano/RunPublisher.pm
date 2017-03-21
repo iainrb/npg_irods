@@ -2,12 +2,17 @@ package WTSI::NPG::OM::BioNano::RunPublisher;
 
 use Moose;
 use namespace::autoclean;
+use sigtrap qw(die untrapped normal-signals
+               stack-trace any error-signals);
+# sigtrap ensures cleanup of temporary directory on unexpected exit
 
 use DateTime;
 use File::Basename qw[basename];
 use File::Spec::Functions;
+use File::Temp qw[tempdir];
 use URI;
 
+use WTSI::DNAP::Utilities::Runnable;
 use WTSI::DNAP::Warehouse::Schema;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::Collection;
@@ -22,6 +27,9 @@ use WTSI::NPG::OM::BioNano::ResultSet;
 our $VERSION = '';
 
 our @BNX_SUFFIXES = qw[bnx];
+our $TAR_SUFFIX = '.tar';
+our $GZIP_SUFFIX = '.gz';
+our $PIGZ_PROCESSES = 4;
 
 with qw[WTSI::DNAP::Utilities::Loggable
         WTSI::NPG::Accountable
@@ -42,6 +50,12 @@ has 'irods' =>
      return WTSI::NPG::iRODS->new;
    });
 
+has 'mlwh_schema' =>
+  (is            => 'ro',
+   isa           => 'WTSI::DNAP::Warehouse::Schema',
+   required      => 1,
+   documentation => 'A ML warehouse handle to obtain secondary metadata');
+
 has 'resultset' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::OM::BioNano::ResultSet',
@@ -50,12 +64,6 @@ has 'resultset' =>
    builder  => '_build_resultset',
    documentation => 'Object containing results from a BioNano runfolder'
 );
-
-has 'mlwh_schema' =>
-  (is            => 'ro',
-   isa           => 'WTSI::DNAP::Warehouse::Schema',
-   required      => 1,
-   documentation => 'A ML warehouse handle to obtain secondary metadata');
 
 #also has uuid attribute from WTSI::NPG::OM::BioNano::Annotator
 
@@ -93,12 +101,13 @@ sub publish {
                  $self->resultset->bnx_file->md5sum, q[']);
     my $leaf_collection = catdir($publish_dest, $hash_path);
     $self->debug(q[Publishing to collection '], $leaf_collection, q[']);
-    # publish data to iRODS, if not already present
+    # compress to .tar.gz format & publish to iRODS, if not already present
     my $dirname = basename($self->resultset->directory);
-    my $bionano_collection = catdir($leaf_collection, $dirname);
-    if ($self->irods->list_collection($bionano_collection)) {
-        $self->info(q[Skipping publication of BioNano data collection '],
-                $bionano_collection, q[': already exists]);
+    my $filename = $dirname.$TAR_SUFFIX.$GZIP_SUFFIX;
+    my $bionano_path = catfile($leaf_collection, $filename);
+    if ($self->irods->list_object($bionano_path)) {
+        $self->info(q[Skipping publication of BioNano data object '],
+                $bionano_path, q[': already exists]);
     } else {
         my @stock_records = $self->_query_ml_warehouse();
         my @collection_meta = $self->make_collection_metadata(
@@ -106,53 +115,29 @@ sub publish {
             @stock_records,
         );
         my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
-        my $bionano_published_coll = $publisher->publish(
-            $self->resultset->directory,
-            $leaf_collection,
+        my $tmp_archive_path =
+            $self->_write_temporary_archive();
+        my $bionano_published_obj = $publisher->publish(
+            $tmp_archive_path,
+            $bionano_path,
             \@collection_meta,
             $timestamp,
         );
-        if ($bionano_published_coll ne $bionano_collection) {
+        if ($bionano_published_obj ne $bionano_path) {
             $self->logcroak(q[Expected BioNano publication destination '],
-                            $bionano_collection,
+                            $bionano_path,
                             q[' not equal to return value from Publisher '],
-                            $bionano_published_coll, q[']
+                            $bionano_published_obj, q[']
                         );
         } else {
             $self->debug(q[Published BioNano runfolder '],
                          $self->resultset->directory,
                          q[' to iRODS destination '],
-                         $bionano_collection, q[']
+                         $bionano_path, q[']
                      );
         }
-        my $bnx_ipath = $self->_apply_bnx_file_metadata($bionano_collection);
-        $self->debug(q[Applied metadata to BNX iRODS object '],
-                     $bnx_ipath, q[']);
     }
-    return $bionano_collection;
-}
-
-sub _apply_bnx_file_metadata {
-    my ($self, $bionano_collection) = @_;
-    # apply metadata to filtered BNX file. Start with metadata applied to
-    # the collection (including by HTS::Publisher)
-    my @bnx_meta;
-    my $md5 = $self->resultset->bnx_file->md5sum;
-    push @bnx_meta, $self->irods->get_collection_meta($bionano_collection);
-    push @bnx_meta, $self->make_md5_metadata($md5);
-    push @bnx_meta, $self->make_type_metadata(
-        $self->resultset->filtered_bnx_path,
-        @BNX_SUFFIXES
-    );
-    # $published_meta includes terms added by HTS::Publisher
-    my $bnx_ipath = File::Spec->catfile($bionano_collection,
-                                        'Detect Molecules',
-                                        'Molecules.bnx');
-    my $bnx_obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $bnx_ipath);
-    foreach my $avu (@bnx_meta) {
-        $bnx_obj->add_avu($avu->{'attribute'}, $avu->{'value'});
-    }
-    return $bnx_ipath;
+    return $bionano_path;
 }
 
 sub _build_resultset {
@@ -180,6 +165,39 @@ sub _query_ml_warehouse {
                     q[for stock ID '], $stock_id, q[']);
     }
     return @stock_records;
+}
+
+sub _write_temporary_archive {
+    # write a temporary .tar.gz file for publication to iRODS
+    # .tar.gz file contains all BNX and ancillary file paths from ResultSet
+    # first archive with tar, then compress with pigz for greater speed
+    my ($self,) = @_;
+    my $tmp = tempdir('bionano_publish_XXXXXX', TMPDIR => 1, CLEANUP => 1);
+    my $tarname = basename($self->resultset->directory).$TAR_SUFFIX;
+    my $tarpath = catfile($tmp, $tarname);
+    my @files;
+    push @files, @{$self->resultset->bnx_paths};
+    push @files, @{$self->resultset->ancillary_file_paths};
+    # write tar inputs to a file; sidesteps issues with spaces in filenames
+    my $listpath = catfile($tmp, 'filenames.txt');
+    open my $out, ">", $listpath ||
+        $self->logcroak("Cannot open temporary file '$listpath'");
+    foreach my $file (@files) { print $out $file."\n"; }
+    close $out || $self->logcroak("Cannot close temporary file '$listpath'");
+    WTSI::DNAP::Utilities::Runnable->new(
+        executable => 'tar',
+        arguments  => ['-c', '-f', $tarpath, '-T', $listpath],
+    )->run();
+    WTSI::DNAP::Utilities::Runnable->new(
+        executable => 'pigz',
+        arguments  => ['-p', $PIGZ_PROCESSES, $tarpath],
+    )->run();
+    my $gztarpath = $tarpath.$GZIP_SUFFIX;
+    if (! -e $gztarpath) {
+        $self->logcroak(q[Temporary archive path '],
+                        $gztarpath, q[' does not exist]);
+    }
+    return $gztarpath;
 }
 
 
@@ -214,7 +232,7 @@ for results from the BioNano optical mapping system.
 =head1 DESCRIPTION
 
 This class provides methods for publishing a BioNano unit runfolder to
-iRODS, with relevant metadata.
+iRODS, with relevant metadata, in the form of a compressed TAR file.
 
 The "unit" runfolder contains data from one run on the BioNano instrument,
 with a given sample, flowcell, and chip. The results of multiple runs are
@@ -226,7 +244,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
@@ -238,8 +256,5 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-=head1 DESCRIPTION
-
-Class to publish a BioNano ResultSet to iRODS.
 
 =cut
