@@ -87,7 +87,7 @@ sub publish {
         $timestamp = DateTime->now();
     }
     my $hash_path =
-        $self->irods->hash_path($self->resultset->bnx_path,
+        $self->irods->hash_path($self->resultset->filtered_bnx_path,
                                 $self->resultset->bnx_file->md5sum);
     $self->debug(q[Found hashed path '], $hash_path, q[' from checksum '],
                  $self->resultset->bnx_file->md5sum, q[']);
@@ -140,8 +140,10 @@ sub _apply_bnx_file_metadata {
     my $md5 = $self->resultset->bnx_file->md5sum;
     push @bnx_meta, $self->irods->get_collection_meta($bionano_collection);
     push @bnx_meta, $self->make_md5_metadata($md5);
-    push @bnx_meta, $self->make_type_metadata($self->resultset->bnx_path,
-                                              @BNX_SUFFIXES);
+    push @bnx_meta, $self->make_type_metadata(
+        $self->resultset->filtered_bnx_path,
+        @BNX_SUFFIXES
+    );
     # $published_meta includes terms added by HTS::Publisher
     my $bnx_ipath = File::Spec->catfile($bionano_collection,
                                         'Detect Molecules',
