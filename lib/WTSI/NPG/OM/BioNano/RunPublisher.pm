@@ -180,10 +180,16 @@ sub _write_temporary_archive {
     push @files, @{$self->resultset->ancillary_file_paths};
     # write tar inputs to a file; sidesteps issues with spaces in filenames
     my $listpath = catfile($tmp, 'filenames.txt');
-    open my $out, ">", $listpath ||
-        $self->logcroak("Cannot open temporary file '$listpath'");
-    foreach my $file (@files) { print $out $file."\n"; }
-    close $out || $self->logcroak("Cannot close temporary file '$listpath'");
+    open my $out, '>', $listpath ||
+        $self->logcroak(q[Cannot open temporary file '], $listpath, q[']);
+    foreach my $file (@files) {
+        print $out $file."\n" || $self->logcroak(q[Failed writing string '],
+                                                 $file,
+                                                 q[' to temporary file '],
+                                                 $listpath, q[']);
+    }
+    close $out ||
+        $self->logcroak(q[Cannot close temporary file '], $listpath, q[']);
     WTSI::DNAP::Utilities::Runnable->new(
         executable => 'tar',
         arguments  => ['-c', '-f', $tarpath, '-T', $listpath],
