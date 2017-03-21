@@ -115,8 +115,7 @@ sub publish {
             @stock_records,
         );
         my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
-        my $tmp_archive_path =
-            $self->_write_temporary_archive();
+        my $tmp_archive_path = $self->_write_temporary_archive();
         my $bionano_published_obj = $publisher->publish(
             $tmp_archive_path,
             $bionano_path,
@@ -202,6 +201,8 @@ sub _write_temporary_archive {
     if (! -e $gztarpath) {
         $self->logcroak(q[Temporary archive path '],
                         $gztarpath, q[' does not exist]);
+    } else {
+        $self->debug(q[Created temporary archive path '], $gztarpath, q[']);
     }
     return $gztarpath;
 }
@@ -222,14 +223,12 @@ for results from the BioNano optical mapping system.
 
 =head1 SYNOPSIS
 
-  my $resultset = WTSI::NPG::OM::BioNano::ResultSet->new
-    (directory => $dir);
-
   my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new
-    (irods            => $irods_handle,
+    (directory        => $dir,
+     irods            => $irods_handle,
      accountee_uid    => $accountee_uid,
      affiliation_uri  => $affiliation_uri,
-     resultset        => $resultset);
+    );
 
   # Publish to iRODS with a given timestamp
   $publisher->publish($publish_dest, $timestamp);
@@ -238,7 +237,10 @@ for results from the BioNano optical mapping system.
 =head1 DESCRIPTION
 
 This class provides methods for publishing a BioNano unit runfolder to
-iRODS, with relevant metadata, in the form of a compressed TAR file.
+iRODS, with relevant metadata, in the form of a compressed TAR file. Any
+TIFF image files present in the runfolder are omitted from iRODS publication.
+The tree rooted at the runfolder path must contain exactly one filtered BNX
+file, named Molecules.bnx.
 
 The "unit" runfolder contains data from one run on the BioNano instrument,
 with a given sample, flowcell, and chip. The results of multiple runs are
