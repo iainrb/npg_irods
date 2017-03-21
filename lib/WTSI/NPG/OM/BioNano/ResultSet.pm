@@ -22,6 +22,16 @@ has 'directory' =>
    isa      => 'Str',
    required => 1);
 
+has 'ancillary_file_paths' =>
+  (is       => 'ro',
+   isa      => 'ArrayRef[Str]',
+   lazy     => 1,
+   builder  => '_build_ancillary_file_paths',
+   init_arg => undef,
+   documentation => 'Paths of ancillary files with information on the '.
+       'run. Excludes BNX files and TIFF image files.',
+);
+
 has 'bnx_file' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::OM::BioNano::BnxFile',
@@ -49,6 +59,8 @@ has 'filtered_bnx_path' =>
    lazy     => 1,
    builder  => '_build_filtered_bnx_path',
    init_arg => undef,
+   documentation => 'Paths of the filtered BNX file. Exactly one '.
+       'filtered BNX file must be present, otherwise an error is raised',
 );
 
 has 'run_date' =>
@@ -58,16 +70,6 @@ has 'run_date' =>
    builder  => '_build_run_date',
    init_arg => undef,
    documentation => 'Date and time of run, parsed from the runfolder name',
-);
-
-has 'ancillary_file_paths' =>
-  (is       => 'ro',
-   isa      => 'ArrayRef[Str]',
-   lazy     => 1,
-   builder  => '_build_ancillary_file_paths',
-   init_arg => undef,
-   documentation => 'Paths of ancillary files with information on the '.
-       'run. Excludes BNX files and TIFF image files.',
 );
 
 has 'stock' =>
@@ -196,7 +198,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
@@ -210,10 +212,12 @@ GNU General Public License for more details.
 
 =head1 DESCRIPTION
 
-Class to represent a BioNano result set. The result set is a directory
-containing a data subdirectory, which in turn contains two BNX files,
-respectively filtered and unfiltered. The directory and subdirectory may
-also contain ancillary files with information on the run.
+Class to represent a BioNano result set, given a directory path.
 
+There must be exactly one Molecules.bnx file in the tree rooted at the
+given directory. The directory may also contain additional BNX files,
+and non-BNX ancillary files. TIFF image files are omitted from the
+ancillary file listing. Run timestamp and stock barcode are parsed from
+the directory name.
 
 =cut
