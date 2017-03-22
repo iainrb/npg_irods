@@ -11,7 +11,7 @@ use URI;
 
 use base qw[WTSI::NPG::HTS::Test]; # FIXME better path for shared base
 
-use Test::More tests => 6;
+use Test::More tests => 7;
 use Test::Exception;
 
 use English qw[-no_match_vars];
@@ -105,7 +105,7 @@ sub publish : Test(2) {
     );
 }
 
-sub publication_results : Test(3) {
+sub publication_results : Test(4) {
     my $irods = WTSI::NPG::iRODS->new();
     my $publication_time = DateTime->new(
         year       => 2016,
@@ -114,25 +114,58 @@ sub publication_results : Test(3) {
         hour       => 12,
         minute     => 00,
     );
-    # $REAL_USER_ID used by NPG::Annotator, but causes Travis test to fail
-    my $user_name = getpwuid $EFFECTIVE_USER_ID;
-    my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
+
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         directory => $test_run_path,
         mlwh_schema => $wh_schema,
     );
     my $bionano_obj = $publisher->publish($irods_tmp_coll,
                                           $publication_time);
-
     my $bionano_copy = abs_path($tmp_data.'/bionano_published.tar.gz');
     $irods->get_object($bionano_obj, $bionano_copy);
+
     # check contents of tarfile
     my $tar = Archive::Tar->new;
     $tar->read($bionano_copy);
     my @contents = $tar->list_files();
     is(scalar @contents, 28, 'Expected number of files in .tar.gz archive');
+    my $expected_contents = [
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules1.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules2.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules3.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules4.bnx',
+          'stock_barcode_01234_2016-10-04_09_00/Metadata.xml',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RunReport.txt',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch.fov',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars.json',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch1.fov',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch2.fov',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch3.fov',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch4.fov',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules1.mol',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules2.mol',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules3.mol',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules4.mol',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels1.lab',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels2.lab',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels3.lab',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels4.lab',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.mol',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels.lab',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars1.json',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars2.json',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars3.json',
+          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars4.json'
+        ];
+    is_deeply(\@contents, $expected_contents,
+              '.tar.gz archive contents match expected values');
 
-    # find md5sum to check metadata
+    # find values to check metadata
+    # $REAL_USER_ID used by NPG::Annotator, but causes Travis test to fail
+    my $user_name = getpwuid $EFFECTIVE_USER_ID;
+    my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
     my $md5 = Digest::MD5->new;
     $md5->add(read_file($bionano_copy));
     my $md5sum = $md5->hexdigest();

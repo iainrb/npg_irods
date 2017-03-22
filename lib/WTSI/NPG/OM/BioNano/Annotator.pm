@@ -42,19 +42,19 @@ sub make_bnx_metadata {
     return @avus;
 }
 
-=head2 make_collection_metadata
+=head2 make_resultset_metadata
 
   Arg [1]    : WTSI::NPG::OM::BioNano::ResultSet. Required.
   Arg [2]    : Array[WTSI::DNAP::Warehouse::Schema::Result::StockResource]
                ML warehouse Stock records
-  Example    : $coll_meta = $publisher->make_collection_metadata($rs, @stock);
-  Description: Generate metadata to be applied to a BioNano collection
+  Example    : $rs_meta = $publisher->make_resultset_metadata($rs, @stock);
+  Description: Generate metadata to be applied to a BioNano resultset
                in iRODS.
   Returntype : Array[HashRef] AVUs to be used as metadata
 
 =cut
 
-sub make_collection_metadata {
+sub make_resultset_metadata {
     my ($self, $resultset, @stock_records) = @_;
     my @avus;
     if (! defined $resultset) {

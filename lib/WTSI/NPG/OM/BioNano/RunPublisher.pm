@@ -6,10 +6,12 @@ use sigtrap qw(die untrapped normal-signals
                stack-trace any error-signals);
 # sigtrap ensures cleanup of temporary directory on unexpected exit
 
+use Cwd qw[abs_path cwd];
 use DateTime;
 use File::Basename qw[basename];
-use File::Spec::Functions;
+use File::Spec::Functions qw[abs2rel catdir catfile file_name_is_absolute];
 use File::Temp qw[tempdir];
+use Try::Tiny;
 use URI;
 
 use WTSI::DNAP::Utilities::Runnable;
@@ -110,7 +112,7 @@ sub publish {
                 $bionano_path, q[': already exists]);
     } else {
         my @stock_records = $self->_query_ml_warehouse();
-        my @collection_meta = $self->make_collection_metadata(
+        my @resultset_meta = $self->make_resultset_metadata(
             $self->resultset,
             @stock_records,
         );
@@ -119,7 +121,7 @@ sub publish {
         my $bionano_published_obj = $publisher->publish(
             $tmp_archive_path,
             $bionano_path,
-            \@collection_meta,
+            \@resultset_meta,
             $timestamp,
         );
         if ($bionano_published_obj ne $bionano_path) {
@@ -170,37 +172,60 @@ sub _write_temporary_archive {
     # write a temporary .tar.gz file for publication to iRODS
     # .tar.gz file contains all BNX and ancillary file paths from ResultSet
     # first archive with tar, then compress with pigz for greater speed
+    # cd to parent directory of target folder, to avoid unnecessary
+    # levels in tar file structure
     my ($self,) = @_;
-    my $tmp = tempdir('bionano_publish_XXXXXX', TMPDIR => 1, CLEANUP => 1);
-    my $tarname = basename($self->resultset->directory).$TAR_SUFFIX;
-    my $tarpath = catfile($tmp, $tarname);
+    my $startdir = cwd();
+    $self->debug('Starting directory is ', $startdir);
+    my $parent = catdir($self->resultset->directory, q[..]);
+    if (! -d $parent) {
+        $self->logcroak('Runfolder parent directory ', $parent,
+                        ' does not exist');
+    }
+    $parent = abs_path($parent);
     my @files;
     push @files, @{$self->resultset->bnx_paths};
     push @files, @{$self->resultset->ancillary_file_paths};
     # write tar inputs to a file; sidesteps issues with spaces in filenames
+    my $tmp = tempdir('bionano_publish_XXXXXX', TMPDIR => 1, CLEANUP => 1);
     my $listpath = catfile($tmp, 'filenames.txt');
+    $self->debug('Writing TAR input paths relative to runfolder parent ',
+                 $parent, ' to temporary file ', $listpath);
     open my $out, '>', $listpath ||
         $self->logcroak(q[Cannot open temporary file '], $listpath, q[']);
     foreach my $file (@files) {
-        print $out $file."\n" || $self->logcroak(q[Failed writing string '],
-                                                 $file,
-                                                 q[' to temporary file '],
+        $file = abs2rel($file, $parent);
+        $self->debug('Appending ', $file, ' to inputs for TAR file creation');
+        print $out $file."\n" || $self->logcroak(q[Failed writing to path '],
                                                  $listpath, q[']);
     }
     close $out ||
         $self->logcroak(q[Cannot close temporary file '], $listpath, q[']);
-    WTSI::DNAP::Utilities::Runnable->new(
-        executable => 'tar',
-        arguments  => ['-c', '-f', $tarpath, '-T', $listpath],
-    )->run();
-    WTSI::DNAP::Utilities::Runnable->new(
-        executable => 'pigz',
-        arguments  => ['-p', $PIGZ_PROCESSES, $tarpath],
-    )->run();
+    my $tarname = basename($self->resultset->directory).$TAR_SUFFIX;
+    my $tarpath = catfile($tmp, $tarname);
+    try {
+        $self->debug('Changing directory to ', $parent);
+        chdir $parent;
+        WTSI::DNAP::Utilities::Runnable->new(
+            executable => 'tar',
+            arguments  => ['-c', '-f', $tarpath, '-T', $listpath],
+        )->run();
+        WTSI::DNAP::Utilities::Runnable->new(
+            executable => 'pigz',
+            arguments  => ['-p', $PIGZ_PROCESSES, $tarpath],
+        )->run();
+    } catch {
+        $self->fatal('Failed to write temporary archive: ', $_);
+    } finally {
+        # always executed, regardless of try/catch outcome
+        $self->debug('Changing to original directory ', $startdir);
+        chdir $startdir;
+        if (@_) { $self->logconfess('Exiting after error writing .tar.gz'); }
+    };
     my $gztarpath = $tarpath.$GZIP_SUFFIX;
     if (! -e $gztarpath) {
-        $self->logcroak(q[Temporary archive path '],
-                        $gztarpath, q[' does not exist]);
+        $self->logcroak(q[Temporary archive path '], $gztarpath,
+                        q[' does not exist]);
     } else {
         $self->debug(q[Created temporary archive path '], $gztarpath, q[']);
     }
