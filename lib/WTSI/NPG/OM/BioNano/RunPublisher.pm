@@ -99,6 +99,7 @@ sub publish {
     my $hash_path =
         $self->irods->hash_path($self->resultset->filtered_bnx_path,
                                 $self->resultset->bnx_file->md5sum);
+    # publication fails at above line if resultset has no valid bnx_file
     $self->debug(q[Found hashed path '], $hash_path, q[' from checksum '],
                  $self->resultset->bnx_file->md5sum, q[']);
     my $leaf_collection = catdir($publish_dest, $hash_path);
