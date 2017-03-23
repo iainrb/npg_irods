@@ -6,12 +6,12 @@ use sigtrap qw(die untrapped normal-signals
                stack-trace any error-signals);
 # sigtrap ensures cleanup of temporary directory on unexpected exit
 
-use Cwd qw[abs_path cwd];
+use Cwd qw[abs_path];
 use DateTime;
 use File::Basename qw[basename];
 use File::Spec::Functions qw[abs2rel catdir catfile file_name_is_absolute];
 use File::Temp qw[tempdir];
-use Try::Tiny;
+use Path::Class::Dir;
 use URI;
 
 use WTSI::DNAP::Utilities::Runnable;
@@ -176,14 +176,12 @@ sub _write_temporary_archive {
     # cd to parent directory of target folder, to avoid unnecessary
     # levels in tar file structure
     my ($self,) = @_;
-    my $startdir = cwd();
-    $self->debug('Starting directory is ', $startdir);
-    my $parent = catdir($self->resultset->directory, q[..]);
+    my $parent = Path::Class::Dir->new($self->resultset->directory)->parent();
+    $parent = abs_path($parent);
     if (! -d $parent) {
         $self->logcroak('Runfolder parent directory ', $parent,
                         ' does not exist');
     }
-    $parent = abs_path($parent);
     my @files;
     push @files, @{$self->resultset->bnx_paths};
     push @files, @{$self->resultset->ancillary_file_paths};
@@ -204,25 +202,14 @@ sub _write_temporary_archive {
         $self->logcroak(q[Cannot close temporary file '], $listpath, q[']);
     my $tarname = basename($self->resultset->directory).$TAR_SUFFIX;
     my $tarpath = catfile($tmp, $tarname);
-    try {
-        $self->debug('Changing directory to ', $parent);
-        chdir $parent;
-        WTSI::DNAP::Utilities::Runnable->new(
-            executable => 'tar',
-            arguments  => ['-c', '-f', $tarpath, '-T', $listpath],
-        )->run();
-        WTSI::DNAP::Utilities::Runnable->new(
-            executable => 'pigz',
-            arguments  => ['-p', $PIGZ_PROCESSES, $tarpath],
-        )->run();
-    } catch {
-        $self->fatal('Failed to write temporary archive: ', $_);
-    } finally {
-        # always executed, regardless of try/catch outcome
-        $self->debug('Changing to original directory ', $startdir);
-        chdir $startdir;
-        if (@_) { $self->logconfess('Exiting after error writing .tar.gz'); }
-    };
+    WTSI::DNAP::Utilities::Runnable->new(
+        executable => 'tar',
+        arguments  => ['-c', '-C', $parent, '-f', $tarpath, '-T', $listpath],
+    )->run();
+    WTSI::DNAP::Utilities::Runnable->new(
+        executable => 'pigz',
+        arguments  => ['-p', $PIGZ_PROCESSES, $tarpath],
+    )->run();
     my $gztarpath = $tarpath.$GZIP_SUFFIX;
     if (! -e $gztarpath) {
         $self->logcroak(q[Temporary archive path '], $gztarpath,
