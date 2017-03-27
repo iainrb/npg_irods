@@ -11,7 +11,7 @@ use URI;
 
 use base qw[WTSI::NPG::HTS::Test]; # FIXME better path for shared base
 
-use Test::More tests => 13;
+use Test::More tests => 16;
 use Test::Exception;
 
 use English qw[-no_match_vars];
@@ -39,6 +39,71 @@ my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
 my $data_path = './t/data/bionano';
 my @runfolder_names = qw[stock_barcode_01234_2016-10-04_09_00
                          stock_barcode_56789_2016-10-05_12_00];
+
+# expected contents of .tar.gz files
+my @expected_contents = (
+    [
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules1.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules2.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules3.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules4.bnx',
+        'stock_barcode_01234_2016-10-04_09_00/Metadata.xml',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RunReport.txt',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch.fov',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars.json',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch1.fov',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch2.fov',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch3.fov',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch4.fov',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules1.mol',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules2.mol',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules3.mol',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules4.mol',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels1.lab',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels2.lab',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels3.lab',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels4.lab',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.mol',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels.lab',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars1.json',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars2.json',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars3.json',
+        'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars4.json'
+    ], [
+
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules1.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules2.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules3.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules4.bnx',
+        'stock_barcode_56789_2016-10-05_12_00/Metadata.xml',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RunReport.txt',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch.fov',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars.json',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch1.fov',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch2.fov',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch3.fov',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch4.fov',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules1.mol',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules2.mol',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules3.mol',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules4.mol',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels1.lab',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels2.lab',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels3.lab',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels4.lab',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules.mol',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels.lab',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars1.json',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars2.json',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars3.json',
+        'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars4.json',
+    ],
+);
+
 my @test_run_paths;
 my $fixture_path = "t/fixtures";
 my $tmp_data;
@@ -136,37 +201,8 @@ sub publication_results : Test(4) {
     $tar->read($bionano_copy);
     my @contents = $tar->list_files();
     is(scalar @contents, 28, 'Expected number of files in .tar.gz archive');
-    my $expected_contents = [
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules1.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules2.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules3.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RawMolecules4.bnx',
-          'stock_barcode_01234_2016-10-04_09_00/Metadata.xml',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/RunReport.txt',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch.fov',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars.json',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch1.fov',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch2.fov',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch3.fov',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Stitch4.fov',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules1.mol',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules2.mol',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules3.mol',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules4.mol',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels1.lab',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels2.lab',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels3.lab',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels4.lab',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Molecules.mol',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/Labels.lab',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars1.json',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars2.json',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars3.json',
-          'stock_barcode_01234_2016-10-04_09_00/Detect Molecules/iovars4.json'
-        ];
-    is_deeply(\@contents, $expected_contents,
+
+    is_deeply(\@contents, $expected_contents[0],
               '.tar.gz archive contents match expected values');
 
     # check md5 in metadata
@@ -274,6 +310,27 @@ sub publication_results : Test(4) {
 
 }
 
+sub alternate_output_dir : Test(3) {
+    # test the output_dir attribute
+    my $outdir = $tmp_data.'/tgz_output';
+    mkdir $outdir || $log->logcroak('Failed to create directory ', $outdir);
+    my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
+        directory   => $test_run_paths[0],
+        mlwh_schema => $wh_schema,
+        output_dir  => $outdir,
+    );
+    $publisher->publish($irods_tmp_coll);
+    my $expected_tgz = $outdir.'/stock_barcode_01234_2016-10-04_09_00.tar.gz';
+    ok(-e $expected_tgz, 'Local .tar.gz file written');
+    my $tar = Archive::Tar->new;
+    $tar->read($expected_tgz);
+    my @contents = $tar->list_files();
+    is(scalar @contents, 28, 'Expected number of files in .tar.gz archive');
+    is_deeply(\@contents, $expected_contents[0],
+              '.tar.gz archive contents match expected values');
+
+}
+
 sub dies_with_malformed_runfolder_name : Test(1) {
     my $run_copy_dir = $tmp_data.'/bad_name';
     mkdir $run_copy_dir ||
@@ -350,37 +407,7 @@ sub publish_without_stock_meta : Test(4) {
     my @contents = $tar->list_files();
     is(scalar @contents, 28, 'Expected number of files in .tar.gz archive');
 
-    my $expected_contents = [
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules1.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules2.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules3.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RawMolecules4.bnx',
-          'stock_barcode_56789_2016-10-05_12_00/Metadata.xml',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/RunReport.txt',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch.fov',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars.json',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch1.fov',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch2.fov',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch3.fov',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Stitch4.fov',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules1.mol',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules2.mol',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules3.mol',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules4.mol',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels1.lab',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels2.lab',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels3.lab',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels4.lab',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Molecules.mol',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/Labels.lab',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars1.json',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars2.json',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars3.json',
-          'stock_barcode_56789_2016-10-05_12_00/Detect Molecules/iovars4.json'
-        ];
-    is_deeply(\@contents, $expected_contents,
+    is_deeply(\@contents, $expected_contents[1],
               '.tar.gz archive contents match expected values');
 
     # check md5 in metadata

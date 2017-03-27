@@ -11,7 +11,6 @@ use DateTime;
 use File::Basename qw[basename];
 use File::Spec::Functions qw[abs2rel catdir catfile file_name_is_absolute];
 use File::Temp qw[tempdir];
-use Path::Class::Dir;
 use URI;
 
 use WTSI::DNAP::Utilities::Runnable;
@@ -42,6 +41,14 @@ has 'directory' =>
    isa      => 'Str',
    required => 1,
    documentation => 'Path of a BioNano runfolder to be published'
+);
+
+has 'output_dir' =>
+  (is       => 'ro',
+   isa      => 'Maybe[Str]',
+   documentation => 'Directory path on the local filesystem for .tar.gz '.
+       'output. Optional; if not given, .tar.gz file will be written to a '.
+       'temporary directory and deleted on exit',
 );
 
 has 'irods' =>
@@ -176,8 +183,7 @@ sub _write_temporary_archive {
     # cd to parent directory of target folder, to avoid unnecessary
     # levels in tar file structure
     my ($self,) = @_;
-    my $parent = Path::Class::Dir->new($self->resultset->directory)->parent();
-    $parent = abs_path($parent);
+    my $parent = abs_path(catdir($self->resultset->directory, q[..]));
     if (! -d $parent) {
         $self->logcroak('Runfolder parent directory ', $parent,
                         ' does not exist');
@@ -187,6 +193,7 @@ sub _write_temporary_archive {
     push @files, @{$self->resultset->ancillary_file_paths};
     # write tar inputs to a file; sidesteps issues with spaces in filenames
     my $tmp = tempdir('bionano_publish_XXXXXX', TMPDIR => 1, CLEANUP => 1);
+    my $tardir = $self->output_dir || $tmp;
     my $listpath = catfile($tmp, 'filenames.txt');
     $self->debug('Writing TAR input paths relative to runfolder parent ',
                  $parent, ' to temporary file ', $listpath);
@@ -201,7 +208,7 @@ sub _write_temporary_archive {
     close $out ||
         $self->logcroak(q[Cannot close temporary file '], $listpath, q[']);
     my $tarname = basename($self->resultset->directory).$TAR_SUFFIX;
-    my $tarpath = catfile($tmp, $tarname);
+    my $tarpath = catfile($tardir, $tarname);
     WTSI::DNAP::Utilities::Runnable->new(
         executable => 'tar',
         arguments  => ['-c', '-C', $parent, '-f', $tarpath, '-T', $listpath],

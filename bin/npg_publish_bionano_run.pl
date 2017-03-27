@@ -35,6 +35,7 @@ sub run {
     my $days_ago;
     my $debug;
     my $log4perl_config;
+    my $output_dir;
     my $collection;
     my $runfolder_path;
     my $search_dir;
@@ -48,6 +49,7 @@ sub run {
         'help'                            => sub {
             pod2usage(-verbose => 2, -exitval => 0) },
         'logconf=s'                       => \$log4perl_config,
+        'output-dir|output_dir=s'         => \$output_dir,
         'runfolder-path|runfolder_path=s' => \$runfolder_path,
         'search-dir|search_dir=s'         => \$search_dir,
         'verbose'                         => \$verbose
@@ -109,10 +111,16 @@ sub run {
                 $collection, q[']);
     my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
     foreach my $dir (@dirs) {
+        my %publish_args = (
+            directory => $dir,
+            mlwh_schema => $wh_schema,
+        );
+        if (defined $output_dir) {
+            $publish_args{'output_dir'} = $output_dir;
+        }
         try {
             my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
-                directory => $dir,
-                mlwh_schema => $wh_schema,
+                %publish_args,
             );
             my $dest_obj = $publisher->publish($collection);
             $num_published++;
@@ -160,6 +168,10 @@ Options:
   --collection      The data destination root collection in iRODS.
   --help            Display help.
   --logconf         A log4perl configuration file. Optional.
+  --output-dir
+  --output_dir      Directory for .tar.gz output. Optional; if not given,
+                    .tar.gz file will be written to a temporary directory
+                    and deleted on script exit.
   --runfolder-path
   --runfolder_path  The instrument runfolder path to load. Incompatible
                     with --search_dir. Optional. If neither this option
