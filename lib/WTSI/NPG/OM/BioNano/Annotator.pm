@@ -24,7 +24,7 @@ has 'uuid' =>
 
 =head2 make_bnx_metadata
 
-  Arg [1]    : WTSI::NPG::OM::BioNano::ResultSet
+  Arg [1]    : WTSI::NPG::OM::BioNano::BnxFile
   Example    : @bnx_meta = $publisher->get_bnx_metadata();
   Description: Find metadata AVUs from the BNX file header, to be applied
                to a BioNano collection in iRODS.
