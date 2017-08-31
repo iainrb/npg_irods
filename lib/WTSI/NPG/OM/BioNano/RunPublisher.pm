@@ -107,7 +107,7 @@ sub publish {
             $leaf_collection,
             $collection_meta,
             $timestamp,
-        );
+        )->str();
         if ($bionano_published_coll ne $bionano_collection) {
             $self->logcroak(q[Expected BioNano publication destination '],
                             $bionano_collection,
