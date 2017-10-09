@@ -125,21 +125,24 @@ sub list_sts_xml_files : Test(1) {
             'Found sts XML files A01_1');
 }
 
-sub publish_files : Test(1) {
+sub publish_files : Test(2) {
   my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
                                     strict_baton_version => 0);
   my $runfolder_path = "$data_path/superfoo/45137_1095";
   my $dest_coll = "$irods_tmp_coll/publish_files";
 
+  my $tmpdir = File::Temp->newdir(TEMPLATE => "./batch_tmp.XXXXXX");
   my $pub = WTSI::NPG::HTS::PacBio::RunPublisher->new
     (dest_collection => $dest_coll,
      irods           => $irods,
      mlwh_schema     => $wh_schema,
+     restart_file    => catfile($tmpdir->dirname, 'published.json'),
      runfolder_path  => $runfolder_path);
 
   my ($num_files, $num_processed, $num_errors) = $pub->publish_files;
   my $num_expected = 42;
 
+  cmp_ok($num_errors,    '==', 0, 'No errors on publishing');
   cmp_ok($num_processed, '==', $num_expected, "Published $num_expected files");
 }
 
@@ -149,10 +152,12 @@ sub publish_meta_xml_files : Test(9) {
   my $runfolder_path = "$data_path/superfoo/45137_1095";
   my $dest_coll = "$irods_tmp_coll/publish_meta_xml_file";
 
+  my $tmpdir = File::Temp->newdir(TEMPLATE => "./batch_tmp.XXXXXX");
   my $pub = WTSI::NPG::HTS::PacBio::RunPublisher->new
     (dest_collection => $dest_coll,
      irods           => $irods,
      mlwh_schema     => $wh_schema,
+     restart_file    => catfile($tmpdir->dirname, 'published.json'),
      runfolder_path  => $runfolder_path);
 
   my @expected_paths =
@@ -179,10 +184,12 @@ sub publish_basx_files : Test(68) {
   my $runfolder_path = "$data_path/superfoo/45137_1095";
   my $dest_coll = "$irods_tmp_coll/publish_basx_files";
 
+  my $tmpdir = File::Temp->newdir(TEMPLATE => "./batch_tmp.XXXXXX");
   my $pub = WTSI::NPG::HTS::PacBio::RunPublisher->new
     (dest_collection => $dest_coll,
      irods           => $irods,
      mlwh_schema     => $wh_schema,
+     restart_file    => catfile($tmpdir->dirname, 'published.json'),
      runfolder_path  => $runfolder_path);
 
   my @expected_paths =
@@ -214,10 +221,12 @@ sub publish_sts_xml_files : Test(9) {
   my $runfolder_path = "$data_path/superfoo/45137_1095";
   my $dest_coll = "$irods_tmp_coll/publish_sts_xml_files";
 
+  my $tmpdir = File::Temp->newdir(TEMPLATE => "./batch_tmp.XXXXXX");
   my $pub = WTSI::NPG::HTS::PacBio::RunPublisher->new
     (dest_collection => $dest_coll,
      irods           => $irods,
      mlwh_schema     => $wh_schema,
+     restart_file    => catfile($tmpdir->dirname, 'published.json'),
      runfolder_path  => $runfolder_path);
 
   my @expected_paths =
@@ -244,10 +253,12 @@ sub publish_multiplexed : Test(80) {
   my $runfolder_path = "$data_path/superfoo/39859_968";
   my $dest_coll = "$irods_tmp_coll/publish_multiplexed";
 
+  my $tmpdir = File::Temp->newdir(TEMPLATE => "./batch_tmp.XXXXXX");
   my $pub = WTSI::NPG::HTS::PacBio::RunPublisher->new
     (dest_collection => $dest_coll,
      irods           => $irods,
      mlwh_schema     => $wh_schema,
+     restart_file    => catfile($tmpdir->dirname, 'published.json'),
      runfolder_path  => $runfolder_path);
 
   my @expected_paths =
@@ -316,13 +327,13 @@ sub check_primary_metadata {
     my $file_name = fileparse($obj->str);
 
     foreach my $attr
-      ($WTSI::NPG::HTS::PacBio::Annotator::PACBIO_CELL_INDEX,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_COLLECTION_NUMBER,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_INSTRUMENT_NAME,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_RUN,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_SET_NUMBER,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_WELL,
-       $WTSI::NPG::HTS::PacBio::Annotator::PACBIO_SAMPLE_LOAD_NAME) {
+      ($PACBIO_CELL_INDEX,
+       $PACBIO_COLLECTION_NUMBER,
+       $PACBIO_INSTRUMENT_NAME,
+       $PACBIO_RUN,
+       $PACBIO_SET_NUMBER,
+       $PACBIO_WELL,
+       $PACBIO_SAMPLE_LOAD_NAME) {
       my @avu = $obj->find_in_metadata($attr);
       cmp_ok(scalar @avu, '==', 1, "$file_name $attr metadata present");
     }
@@ -338,7 +349,7 @@ sub check_study_metadata {
 
     # study_name is legacy metadata
     foreach my $attr ($STUDY_ID, $STUDY_NAME, $STUDY_ACCESSION_NUMBER,
-                      'study_name') {
+                      $PACBIO_STUDY_NAME) {
       my @avu = $obj->find_in_metadata($attr);
       cmp_ok(scalar @avu, '==', 1, "$file_name $attr metadata present");
     }
@@ -357,8 +368,7 @@ sub check_multiplex_metadata {
        "$file_name multiplex metadata present");
 
     # We can't guarantee that there will be n x other sample metadata
-    foreach my $attr ($WTSI::NPG::HTS::PacBio::Annotator::TAG_SEQUENCE,
-                      $SAMPLE_ID) {
+    foreach my $attr ($TAG_SEQUENCE, $SAMPLE_ID) {
       my @avu = $obj->find_in_metadata($attr);
       cmp_ok(scalar @avu, '==', $n, "$file_name $n x $attr metadata present");
     }

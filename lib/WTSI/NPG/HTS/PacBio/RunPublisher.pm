@@ -11,16 +11,18 @@ use MooseX::StrictConstructor;
 use Try::Tiny;
 
 use WTSI::DNAP::Utilities::Params qw[function_params];
-use WTSI::NPG::HTS::DataObject;
+use WTSI::NPG::HTS::BatchPublisher;
+use WTSI::NPG::HTS::PacBio::DataObjectFactory;
 use WTSI::NPG::HTS::PacBio::MetaXMLParser;
-use WTSI::NPG::HTS::Publisher;
 use WTSI::NPG::iRODS::Metadata;
+use WTSI::NPG::iRODS::Publisher;
 use WTSI::NPG::iRODS;
 
 with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::PathLister
          WTSI::NPG::HTS::PacBio::Annotator
+         WTSI::NPG::HTS::PacBio::MetaQuery
        ];
 
 our $VERSION = '';
@@ -31,17 +33,45 @@ our $DEFAULT_ROOT_COLL    = '/seq/pacbio';
 # The default SMRT analysis results directory name
 our $ANALYSIS_DIR = 'Analysis_Results';
 
+# Well directory pattern
+our $WELL_DIRECTORY_PATTERN = '\d+_\d+$';
+
 has 'irods' =>
   (isa           => 'WTSI::NPG::iRODS',
    is            => 'ro',
    required      => 1,
    documentation => 'An iRODS handle to run searches and perform updates');
 
+has 'obj_factory' =>
+  (does          => 'WTSI::NPG::HTS::DataObjectFactory',
+   is            => 'ro',
+   required      => 1,
+   lazy          => 1,
+   builder       => '_build_obj_factory',
+   documentation => 'A factory building data objects from files');
+
 has 'runfolder_path' =>
   (isa           => 'Str',
    is            => 'ro',
    required      => 1,
    documentation => 'PacBio runfolder path');
+
+has 'batch_publisher' =>
+  (is            => 'ro',
+   isa           => 'WTSI::NPG::HTS::BatchPublisher',
+   required      => 1,
+   lazy          => 1,
+   builder       => '_build_batch_publisher',
+   documentation => 'A publisher implementation capable to handling errors');
+
+has 'restart_file' =>
+  (isa           => 'Str',
+   is            => 'ro',
+   required      => 1,
+   lazy          => 1,
+   builder       => '_build_restart_file',
+   documentation => 'A file containing a list of files for which ' .
+                    'publication failed');
 
 has 'dest_collection' =>
   (isa           => 'Str',
@@ -51,11 +81,20 @@ has 'dest_collection' =>
    builder       => '_build_dest_collection',
    documentation => 'The destination collection within iRODS to store data');
 
-has 'mlwh_schema' =>
-  (is            => 'ro',
-   isa           => 'WTSI::DNAP::Warehouse::Schema',
-   required      => 1,
-   documentation => 'A ML warehouse handle to obtain secondary metadata');
+has 'directory_pattern' =>
+  (isa           => 'Str',
+   is            => 'ro',
+   init_arg      => undef,
+   lazy          => 1,
+   builder       => '_build_directory_pattern',
+   documentation => 'Well directory pattern');
+
+has 'force' =>
+  (isa           => 'Bool',
+   is            => 'ro',
+   required      => 0,
+   default       => 0,
+   documentation => 'Force re-publication of files that have been published');
 
 sub run_name {
   my ($self) = @_;
@@ -63,7 +102,7 @@ sub run_name {
   return first { $_ ne q[] } reverse splitdir($self->runfolder_path);
 }
 
-=head2 smrt_path
+=head2 smrt_names
 
   Arg [1]    : None
 
@@ -76,10 +115,9 @@ sub run_name {
 sub smrt_names {
   my ($self) = @_;
 
-  my $dir_pattern = '\d+_\d+$';
+  my $dir_pattern = $self->directory_pattern;
   my @dirs = grep { -d } $self->list_directory($self->runfolder_path,
                                                $dir_pattern);
-
   my @names = sort map { first { $_ ne q[] } reverse splitdir($_) } @dirs;
 
   return @names;
@@ -208,7 +246,7 @@ sub list_sts_xml_files {
   Arg [1]    : SMRT cell name, Str.
   Arg [2]    : Look index, Int. Optional.
 
-  Example    : $pub->list_smrt_xml_file('A01_1')
+  Example    : $pub->list_meta_xml_file('A01_1')
   Description: Return the path of the metadata XML file for the given SMRT
                cell.  Calling this method will access the file system.
   Returntype : Str
@@ -305,6 +343,11 @@ sub list_meta_xml_file {
       $num_errors    += ($nex + $neb + $nes);
     }
 
+    if ($num_errors > 0) {
+      $self->error("Encountered errors on $num_errors / ",
+                   "$num_processed files processed");
+    }
+
     return ($num_files, $num_processed, $num_errors);
   }
 }
@@ -336,7 +379,7 @@ sub publish_meta_xml_file {
     $self->_publish_files($files, $dest_coll);
 
   $self->info("Published $num_processed / $num_files metadata XML files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
@@ -361,6 +404,9 @@ sub publish_meta_xml_file {
 sub publish_basx_files {
   my ($self, $smrt_name, $look_index) = @_;
 
+  my $files     = $self->list_basx_files($smrt_name, $look_index);
+  my $dest_coll = catdir($self->dest_collection, $smrt_name, $ANALYSIS_DIR);
+
   my $metadata_file = $self->list_meta_xml_file($smrt_name, $look_index);
   $self->debug("Reading metadata from '$metadata_file'");
 
@@ -369,28 +415,35 @@ sub publish_basx_files {
 
   # There will be 1 record for a non-multiplexed SMRT cell and >1
   # record for a multiplexed
-  my @run_records = $self->_query_ml_warehouse($metadata->run_uuid,
-                                               $metadata->library_tube_uuids);
+  my @run_records = $self->find_pacbio_runs($metadata->run_name,
+                                            $metadata->well_name);
+
   # R & D runs have no records in the ML warehouse
   my $is_r_and_d = @run_records ? 0 : 1;
 
-  my @primary_avus   = $self->make_primary_metadata($metadata, $is_r_and_d);
-  my @secondary_avus = $self->make_secondary_metadata(@run_records);
+  my ($num_files, $num_processed, $num_errors) = (0, 0, 0);
 
-  # This call may be removed when the legacy metadata are no longer
-  # required
-  push @secondary_avus, $self->make_legacy_metadata(@run_records);
+  # A production well will always have run_uuid and records in ML
+  # warehouse. Production data are not published unless ML warehouse
+  # records are present.
+  if ($metadata->has_run_uuid && $is_r_and_d) {
+    $self->error("Failed to publish $num_files bas/x files for run ",
+                 $metadata->run_name, ' well ', $metadata->well_name ,
+                 ' as data missing from ML warehouse');
+    $num_files = $num_processed = $num_errors = scalar @{$files};
+  }
+  else {
+    my @primary_avus   = $self->make_primary_metadata($metadata, $is_r_and_d);
+    my @secondary_avus = $self->make_secondary_metadata(@run_records);
+    my @extra_avus     = $self->make_avu($FILE_TYPE, 'bas');
 
-  my $files     = $self->list_basx_files($smrt_name, $look_index);
-  my $dest_coll = catdir($self->dest_collection, $smrt_name, $ANALYSIS_DIR);
-
-  my ($num_files, $num_processed, $num_errors) =
-    $self->_publish_files($files, $dest_coll,
-                          \@primary_avus, \@secondary_avus,
-                          [$self->make_avu($FILE_TYPE, 'bas')]);
+    ($num_files, $num_processed, $num_errors) =
+      $self->_publish_files($files, $dest_coll,
+                            \@primary_avus, \@secondary_avus, \@extra_avus);
+  }
 
   $self->info("Published $num_processed / $num_files bas/x files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
@@ -422,116 +475,51 @@ sub publish_sts_xml_files {
     $self->_publish_files($files, $dest_coll);
 
   $self->info("Published $num_processed / $num_files sts XML files ",
-              "in SMRT cell '$smrt_name'");
+              "in SMRT cell '$smrt_name' with $num_errors errors");
 
   return ($num_files, $num_processed, $num_errors);
 }
 
-## no critic (Subroutines::ProhibitManyArgs)
+sub write_restart_file {
+  my ($self) = @_;
+
+  $self->batch_publisher->write_state;
+  return
+}
+
+## no critic (ProhibitManyArgs)
 sub _publish_files {
   my ($self, $files, $dest_coll, $primary_avus, $secondary_avus,
-      $legacy_avus) = @_;
-
-  defined $files or
-    $self->logconfess('A defined files argument is required');
-  ref $files eq 'ARRAY' or
-    $self->logconfess('The files argument must be an ArrayRef');
-  defined $dest_coll or
-    $self->logconfess('A defined dest_coll argument is required');
+      $extra_avus) = @_;
 
   $primary_avus   ||= [];
   $secondary_avus ||= [];
+  $extra_avus     ||= [];
 
   ref $primary_avus eq 'ARRAY' or
     $self->logconfess('The primary_avus argument must be an ArrayRef');
   ref $secondary_avus eq 'ARRAY' or
     $self->logconfess('The secondary_avus argument must be an ArrayRef');
 
-  my $publisher = WTSI::NPG::HTS::Publisher->new(irods => $self->irods);
-
-  my $num_files     = scalar @{$files};
-  my $num_processed = 0;
-  my $num_errors    = 0;
-
-  foreach my $file (@{$files}) {
-    my $dest = q[];
-
-    try {
-      $num_processed++;
-
-      my ($filename, $directories, $suffix) = fileparse($file);
-      my $obj = WTSI::NPG::HTS::DataObject->new
-        ($self->irods, catfile($dest_coll, $filename));
-      $dest = $obj->str;
-      $dest = $publisher->publish($file, $dest);
-
-      my ($num_pattr, $num_pproc, $num_perr) =
-        $obj->set_primary_metadata(@{$primary_avus});
-      my ($num_sattr, $num_sproc, $num_serr) =
-        $obj->update_secondary_metadata(@{$secondary_avus});
-
-      # This call may be removed when the legacy metadata are no longer
-      # required
-      my ($num_lattr, $num_lproc, $num_lerr) =
-        $self->_add_legacy_metadata($obj, $legacy_avus);
-
-      if ($num_perr > 0) {
-        $self->logcroak("Failed to set primary metadata cleanly on '$dest'");
-      }
-      if ($num_serr > 0) {
-        $self->logcroak("Failed to set secondary metadata cleanly on '$dest'");
-      }
-      if ($num_lerr > 0) {
-        $self->logcroak("Failed to set legacy metadata cleanly on '$dest'");
-      }
-
-      $self->info("Published '$dest' [$num_processed / $num_files]");
-    } catch {
-      $num_errors++;
-      my @stack = split /\n/msx;   # Chop up the stack trace
-      $self->error("Failed to publish '$file' to '$dest' cleanly ",
-                   "[$num_processed / $num_files]: ", pop @stack);
-    };
-  }
-
-  if ($num_errors > 0) {
-    $self->error("Encountered errors on $num_errors / ",
-                 "$num_processed files processed");
-  }
-
-  return ($num_files, $num_processed, $num_errors);
-}
-## use critic
-
-# This method may be removed when the legacy metadata are no longer
-# required
-sub _add_legacy_metadata {
-  my ($self, $obj, $avus) = @_;
-
-  defined $obj or
-    $self->logconfess('A defined obj argument is required');
-
-  $avus ||= [];
-
-  ref $avus eq 'ARRAY' or
-    $self->logconfess('The avus argument must be an ArrayRef');
-
-  my $num_avus      = scalar @{$avus};
-  my $num_processed = 0;
-  my $num_errors    = 0;
-
-  try {
-    foreach my $avu (@{$avus}) {
-      $num_processed++;
-      $obj->add_avu($avu->{attribute}, $avu->{value}, $avu->{units});
-    }
-  } catch {
-    $num_errors++;
-    $self->error('Failed to add legacy avus ', pp($avus), q[: ], $_);
+  my $primary_avus_callback = sub {
+    return @{$primary_avus};
   };
 
-  return ($num_avus, $num_processed, $num_errors);
+  my $secondary_avus_callback = sub {
+    return @{$secondary_avus};
+  };
+
+  my $extra_avus_callback = sub {
+    return @{$extra_avus};
+  };
+
+  return $self->batch_publisher->publish_file_batch
+    ($files, $dest_coll,
+     $primary_avus_callback,
+     $secondary_avus_callback,
+     $extra_avus_callback);
 }
+## use critic
 
 sub _build_dest_collection  {
   my ($self) = @_;
@@ -539,29 +527,45 @@ sub _build_dest_collection  {
   return catdir($DEFAULT_ROOT_COLL, $self->run_name);
 }
 
+sub _build_batch_publisher {
+  my ($self) = @_;
+
+  return WTSI::NPG::HTS::BatchPublisher->new
+    (force                  => $self->force,
+     irods                  => $self->irods,
+     obj_factory            => $self->obj_factory,
+     state_file             => $self->restart_file,
+     require_checksum_cache => []); ## no md5s precreated for PacBio
+}
+
+sub _build_restart_file {
+  my ($self) = @_;
+
+  return catfile($self->runfolder_path, 'published.json');
+}
+
+sub _build_directory_pattern{
+   my ($self) = @_;
+
+   return $WELL_DIRECTORY_PATTERN;
+}
+
+sub _build_obj_factory {
+  my ($self) = @_;
+
+  return WTSI::NPG::HTS::PacBio::DataObjectFactory->new(irods => $self->irods);
+}
+
 # Check that a SMRT cell name argument is given and valid
 sub _check_smrt_name {
   my ($self, $smrt_name) = @_;
 
   defined $smrt_name or
-    $self->logconfess('A defined smart_name argument is required');
+    $self->logconfess('A defined smrt_name argument is required');
   any { $smrt_name eq $_ } $self->smrt_names or
     $self->logconfess("Invalid smrt_name argument '$smrt_name'");
 
   return $smrt_name;
-}
-
-# Look up PacBio run metadata in the ML warehouse using the library
-# tube UUID obtained from the run XML metadata.
-sub _query_ml_warehouse {
-  my ($self, $run_uuid, $library_tube_uuids) = @_;
-
-  my @run_records = $self->mlwh_schema->resultset('PacBioRun')->search
-    ({pac_bio_run_uuid          => $run_uuid,
-      pac_bio_library_tube_uuid => {'-in' => $library_tube_uuids}},
-     {prefetch                  => ['sample', 'study']});
-
-  return @run_records;
 }
 
 __PACKAGE__->meta->make_immutable;
@@ -622,7 +626,8 @@ Keith James E<lt>kdj@sanger.ac.ukE<gt>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2011, 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2011, 2016, 2017 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
