@@ -10,36 +10,75 @@ use Log::Log4perl qw[:levels];
 use Pod::Usage;
 
 use WTSI::DNAP::Warehouse::Schema;
-use WTSI::NPG::HTS::PacBio::RunPublisher;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::HTS::PacBio::RunPublisher;
+use WTSI::NPG::HTS::PacBio::Sequel::RunPublisher;
 
 our $VERSION = '';
 
+my $verbose_config = << 'LOGCONF'
+log4perl.logger = ERROR, A1
+
+log4perl.logger.WTSI.NPG.HTS.PacBio = INFO, A1
+log4perl.logger.WTSI.NPG.HTS = INFO, A1
+log4perl.logger.WTSI.NPG.iRODS.Publisher = INFO, A1
+
+# Errors from WTSI::NPG::iRODS are propagated in the code to callers
+# in WTSI::NPG::HTS::PacBio, so we do not need to see them directly:
+
+log4perl.logger.WTSI.NPG.iRODS = OFF, A1
+
+log4perl.appender.A1 = Log::Log4perl::Appender::Screen
+log4perl.appender.A1.layout = Log::Log4perl::Layout::PatternLayout
+log4perl.appender.A1.layout.ConversionPattern = %d %-5p %c - %m%n
+log4perl.appender.A1.utf8 = 1
+
+# Prevent duplicate messages with a non-Log4j-compliant Log4perl option
+log4perl.oneMessagePerAppender = 1
+LOGCONF
+;
+
 my $collection;
 my $debug;
+my $force = 0;
 my $log4perl_config;
 my $runfolder_path;
 my $verbose;
+my $sequel;
 
 GetOptions('collection=s'                    => \$collection,
            'debug'                           => \$debug,
+           'force'                           => \$force,
            'help'                            => sub {
              pod2usage(-verbose => 2, -exitval => 0);
            },
+           'sequel'                          => \$sequel,
            'logconf=s'                       => \$log4perl_config,
            'runfolder-path|runfolder_path=s' => \$runfolder_path,
            'verbose'                         => \$verbose);
+
+
+
+my $module;
+if ($sequel) {
+  $module = 'WTSI::NPG::HTS::PacBio::Sequel::RunPublisher';
+} else {
+  $module = 'WTSI::NPG::HTS::PacBio::RunPublisher';
+}
 
 # Process CLI arguments
 if ($log4perl_config) {
   Log::Log4perl::init($log4perl_config);
 }
 else {
-  my $level = $debug ? $DEBUG : $verbose ? $INFO : $ERROR;
+  my $level = $debug ? $DEBUG : $verbose ? $INFO : $WARN;
   Log::Log4perl->easy_init({layout => '%d %-5p %c - %m%n',
                             level  => $level,
                             utf8   => 1});
 }
+
+my $log = Log::Log4perl->get_logger('main');
+$log->level($ALL);
 
 if (not (defined $runfolder_path)) {
   my $msg = 'A --runfolder-path argument is required';
@@ -47,21 +86,32 @@ if (not (defined $runfolder_path)) {
             -exitval => 2);
 }
 
+
 my $irods     = WTSI::NPG::iRODS->new;
 my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
 
-my @init_args = (irods          => $irods,
+my @init_args = (force          => $force,
+                 irods          => $irods,
                  mlwh_schema    => $wh_schema,
                  runfolder_path => $runfolder_path);
 if ($collection) {
   push @init_args, dest_collection => $collection;
 }
 
-my $publisher = WTSI::NPG::HTS::PacBio::RunPublisher->new(@init_args);
-my ($num_files, $num_published, $num_errors) = $publisher->publish_files;
+my $publisher = $module->new(@init_args);
 
-my $log = Log::Log4perl->get_logger('main');
-$log->level($ALL);
+use sigtrap 'handler', \&handler, 'normal-signals';
+
+sub handler {
+  my ($signal) = @_;
+
+  $log->info('Writing restart file ', $publisher->restart_file);
+  $publisher->write_restart_file;
+  $log->error("Exiting due to $signal");
+  exit 1;
+}
+
+my ($num_files, $num_published, $num_errors) = $publisher->publish_files;
 
 if ($num_errors == 0) {
   $log->info("Processed $num_files, published $num_published ",
@@ -81,18 +131,22 @@ npg_publish_pacbio_run
 =head1 SYNOPSIS
 
 npg_publish_pacbio_run --runfolder-path <path> [--collection <path>]
-  [--debug] [--verbose] [--logconf <path>]
+  [--force] [--debug] [--verbose] [--logconf <path>] [--sequel]
 
  Options:
    --collection      The destination collection in iRODS. Optional,
                      defaults to /seq/pacbio/.
    --debug           Enable debug level logging. Optional, defaults to
                      false.
+   --force           Force an attempt to re-publish files that have been
+                     published successfully.
    --help            Display help.
    --runfolder-path
    --runfolder_path  The instrument runfolder path to load.
    --logconf         A log4perl configuration file. Optional.
    --verbose         Print messages while processing. Optional.
+   --sequel          If the run folder is output from a PacBio Sequel 
+                     system. Optional.
 
 =head1 DESCRIPTION
 
@@ -119,8 +173,7 @@ collection, the following take place:
    no files have been modified
 
 The default behaviour of the script is to publish all categories of
-file (metadata XML, bas/x.h5 and sts XML), for all available SMRT
-cells.
+file, for all available SMRT cells.
 
 =head1 AUTHOR
 
@@ -128,7 +181,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

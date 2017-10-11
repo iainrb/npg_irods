@@ -6,12 +6,14 @@ use Moose;
 use MooseX::StrictConstructor;
 use Try::Tiny;
 
-use WTSI::NPG::HTS::DataObject;
+use WTSI::NPG::HTS::PacBio::DataObjectFactory;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata qw[$PACBIO_RUN $PACBIO_WELL];
 
 with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::PacBio::Annotator
+         WTSI::NPG::HTS::PacBio::MetaQuery
        ];
 
 our $VERSION = '';
@@ -22,11 +24,14 @@ has 'irods' =>
    required      => 1,
    documentation => 'An iRODS handle to run searches and perform updates');
 
-has 'mlwh_schema' =>
+has 'obj_factory' =>
   (is            => 'ro',
-   isa           => 'WTSI::DNAP::Warehouse::Schema',
+   isa           => 'WTSI::NPG::HTS::DataObjectFactory',
    required      => 1,
-   documentation => 'A ML warehouse handle to obtain secondary metadata');
+   lazy          => 1,
+   builder       => '_build_obj_factory',
+   documentation => 'A factory building data objects from files');
+
 
 =head2 update_secondary_metadata
 
@@ -56,16 +61,13 @@ sub update_secondary_metadata {
   foreach my $path (@{$paths}) {
     $self->info("Updating metadata on '$path' [$num_processed / $num_paths]");
 
-    my $obj = WTSI::NPG::HTS::DataObject->new($self->irods, $path);
+    my $obj = $self->obj_factory->make_data_object($path);
 
-    # TODO -- use WTSI::NPG::iRODS::Metadata for these attributes
-    my $id_run =
-      $obj->get_avu($WTSI::NPG::HTS::PacBio::Annotator::PACBIO_RUN)->{value};
-    my $well   =
-      $obj->get_avu($WTSI::NPG::HTS::PacBio::Annotator::PACBIO_WELL)->{value};
+    my $id_run = $obj->get_avu($PACBIO_RUN)->{value};
+    my $well   = $obj->get_avu($PACBIO_WELL)->{value};
 
     try {
-      my @run_records = $self->_query_ml_warehouse($id_run, $well);
+      my @run_records = $self->find_pacbio_runs($id_run, $well);
       my @secondary_avus = $self->make_secondary_metadata(@run_records);
       $obj->update_secondary_metadata(@secondary_avus);
 
@@ -83,31 +85,13 @@ sub update_secondary_metadata {
   return $num_processed - $num_errors;
 }
 
-sub _query_ml_warehouse {
-  my ($self, $run_id, $well) = @_;
 
-  # Well addresses are unpadded in the ML warehouse
-  my ($row, $col) = $well =~ m{^([[:upper:]])([[:digit:]]+)$}msx;
-  if ($row and $col) {
-    $col =~ s/^0+//msx; # Remove leading zeroes
-  }
-  else {
-    $self->logcroak("Failed to match a plate row and column in well '$well' ",
-                    "of PacBio run '$run_id'");
-  }
+sub _build_obj_factory {
+  my ($self) = @_;
 
-  my $well_label = "$row$col";
-  my @run_records = $self->mlwh_schema->resultset('PacBioRun')->search
-    ({id_pac_bio_run_lims => $run_id,
-      well_label          => $well_label},
-     {prefetch            => ['sample', 'study']});
-
-  my $num_records = scalar @run_records;
-  $self->debug("Found $num_records records for PacBio ",
-               "run $run_id, well $well_label");
-
-  return @run_records;
+  return WTSI::NPG::HTS::PacBio::DataObjectFactory->new(irods => $self->irods);
 }
+
 
 __PACKAGE__->meta->make_immutable;
 

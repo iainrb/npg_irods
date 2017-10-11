@@ -107,6 +107,8 @@ sub run {
         @dirs = $collector->collect_dirs_modified_between($begin->epoch,
                                                           $end->epoch);
     }
+
+    my $irods = WTSI::NPG::iRODS->new;
     my $total = scalar @dirs;
     my $num_published = 0;
     my $errors = 0;
@@ -115,10 +117,10 @@ sub run {
     my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
     foreach my $dir (@dirs) {
         try {
-            my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
-                directory => $dir,
-                mlwh_schema => $wh_schema,
-            );
+          my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new
+            (directory => $dir,
+             mlwh_schema => $wh_schema,
+             irods     => $irods);
             my $dest_collection = $publisher->publish($collection);
             $num_published++;
             $log->info(q[Published BioNano run directory '], $dir,

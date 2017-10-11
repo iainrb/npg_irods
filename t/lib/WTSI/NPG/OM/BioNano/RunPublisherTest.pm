@@ -7,7 +7,7 @@ use URI;
 
 use base qw[WTSI::NPG::HTS::Test]; # FIXME better path for shared base
 
-use Test::More tests => 7;
+use Test::More;
 use Test::Exception;
 
 use English qw[-no_match_vars];
@@ -90,6 +90,7 @@ sub publish : Test(2) {
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         directory => $test_run_path,
         publication_time => $publication_time,
+        irods            => $irods,
         mlwh_schema => $wh_schema,
     );
     ok($publisher, "BioNano RunPublisher object created");
@@ -117,6 +118,7 @@ sub metadata : Test(4) {
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         directory => $test_run_path,
         mlwh_schema => $wh_schema,
+        irods     => $irods,
     );
     my $bionano_coll = $publisher->publish($irods_tmp_coll,
                                            $publication_time);
@@ -313,5 +315,50 @@ sub metadata : Test(4) {
               'BNX file metadata matches expected values');
 }
 
+sub script : Test(10) {
+
+    my $irods = WTSI::NPG::iRODS->new();
+
+    system("find $test_run_path -exec touch {} +") && $log->logcroak(
+        "Failed to recursively update access time for $test_run_path"
+    );
+
+    my $script = "npg_publish_bionano_run.pl";
+
+    my $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data";
+
+    ok(system($cmd)==0, "Publish script run successfully with search dir");
+
+    my $expected_coll = $irods_tmp_coll."/d5/0f/b6/".$runfolder_name;
+    ok($irods->is_collection($expected_coll),
+       "Script publishes to expected iRODS collection");
+
+    my $expected_bnx = $expected_coll."/Detect Molecules/Molecules.bnx";
+    ok($irods->is_object($expected_bnx),
+       "Script publishes expected filtered BNX file");
+
+    $irods->remove_collection($expected_coll);
+
+    $cmd = "$script --collection $irods_tmp_coll --search_dir $tmp_data ".
+        "--runfolder_path $test_run_path 2> /dev/null";
+    ok(system($cmd)!=0, "Publish script fails with incompatible arguments");
+    ok(! $irods->is_collection($expected_coll),
+       "No iRODS collection published by failed script");
+
+    $cmd = "$script --collection $irods_tmp_coll --runfolder_path ".
+        "$tmp_data/foo/bar 2> /dev/null";
+    ok(system($cmd)!=0, "Publish script has non-zero exit status for ".
+           "nonexistent input");
+    ok(! $irods->is_collection($expected_coll),
+       "No iRODS collection published by failed script");
+
+    $cmd = "$script --collection $irods_tmp_coll ".
+        "--runfolder_path $test_run_path";
+    ok(system($cmd)==0, "Publish script run successfully with runfolder");
+    ok($irods->is_collection($expected_coll),
+       "Script publishes to expected iRODS collection");
+    ok($irods->is_object($expected_bnx),
+       "Script publishes expected filtered BNX file");
+}
 
 1;
