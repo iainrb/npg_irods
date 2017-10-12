@@ -54,6 +54,7 @@ lib/WTSI/NPG/HTS/Types.pm
 lib/WTSI/NPG/OM/BioNano/Annotator.pm
 lib/WTSI/NPG/OM/BioNano/BnxFile.pm
 lib/WTSI/NPG/OM/BioNano/ResultSet.pm
+lib/WTSI/NPG/OM/BioNano/RunFinder.pm
 lib/WTSI/NPG/OM/BioNano/RunPublisher.pm
 LICENSE
 MANIFEST			This list of files
@@ -68,6 +69,7 @@ t/anc_data_object.t
 t/annotator.t
 t/bionano_bnx_file.t
 t/bionano_result_set.t
+t/bionano_run_finder.t
 t/bionano_run_publisher.t
 t/compile_scripts.t
 t/critic.t
@@ -7579,6 +7581,7 @@ t/lib/WTSI/NPG/HTS/SeqchksumTest.pm
 t/lib/WTSI/NPG/HTS/Test.pm
 t/lib/WTSI/NPG/OM/BioNano/BnxFileTest.pm
 t/lib/WTSI/NPG/OM/BioNano/ResultSetTest.pm
+t/lib/WTSI/NPG/OM/BioNano/RunFinderTest.pm
 t/lib/WTSI/NPG/OM/BioNano/RunPublisherTest.pm
 t/log_publisher.t
 t/pacbio_apiclient.t
