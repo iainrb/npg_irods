@@ -91,7 +91,7 @@ sub publish : Test(2) {
         directory => $test_run_path,
         publication_time => $publication_time,
         irods            => $irods,
-        mlwh_schema => $wh_schema,
+        mlwh_schema      => $wh_schema,
     );
     ok($publisher, "BioNano RunPublisher object created");
 
@@ -117,6 +117,7 @@ sub metadata : Test(4) {
     my $affiliation_uri = URI->new('http://www.sanger.ac.uk');
     my $publisher = WTSI::NPG::OM::BioNano::RunPublisher->new(
         directory => $test_run_path,
+        irods => $irods,
         mlwh_schema => $wh_schema,
         irods     => $irods,
     );

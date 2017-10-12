@@ -16,18 +16,10 @@ use Try::Tiny;
 use WTSI::DNAP::Utilities::Collector;
 use WTSI::DNAP::Utilities::ConfigureLogger qw[log_init];
 use WTSI::DNAP::Warehouse::Schema;
+use WTSI::NPG::OM::BioNano::RunFinder;
 use WTSI::NPG::OM::BioNano::RunPublisher;
 
 our $VERSION = '';
-our $BIONANO_REGEX = qr{^\S+_\d{4}-\d{2}-\d{2}_\d{2}_\d{2}$}msx;
-our $DEFAULT_DAYS = 7;
-
-{
-  package TestDBFactory;
-  use Moose;
-
-  with 'npg_testing::db';
-}
 
 if (! caller ) {
     my $result = run();
@@ -67,8 +59,6 @@ sub run {
         pod2usage(-msg     => "A --collection argument is required\n",
                   -exitval => 2);
     }
-    $days           ||= $DEFAULT_DAYS;
-    $days_ago       ||= 0;
 
     my @log_levels;
     if ($debug) { push @log_levels, $DEBUG; }
@@ -84,28 +74,8 @@ sub run {
         $log->info(q[Publishing runfolder path '], $runfolder_path,
                    q[' to '], $collection, q[']);
     } else {
-        $search_dir ||= cwd();
-        $search_dir = abs_path($search_dir);
-        my $now = DateTime->now;
-        my $end;
-        if ($days_ago > 0) {
-            $end = DateTime->from_epoch
-                (epoch => $now->epoch)->subtract(days => $days_ago);
-        } else {
-            $end = $now;
-        }
-        my $begin = DateTime->from_epoch
-            (epoch => $end->epoch)->subtract(days => $days);
-        $log->info(q[Publishing from '], $search_dir, q[' to '],
-                   $collection, q[' BioNano results finished between ],
-                   $begin->iso8601, q[ and ], $end->iso8601);
-        my $collector = WTSI::DNAP::Utilities::Collector->new(
-            root  => $search_dir,
-            depth => 2,
-            regex => $BIONANO_REGEX,
-        );
-        @dirs = $collector->collect_dirs_modified_between($begin->epoch,
-                                                          $end->epoch);
+        my $finder = WTSI::NPG::OM::BioNano::RunFinder->new;
+        @dirs = $finder->find($search_dir, $days_ago, $days);
     }
 
     my $irods = WTSI::NPG::iRODS->new;
