@@ -36,6 +36,7 @@ my $build = Build->new
     'Data::Dump'                    => 0,
     'DateTime'                      => '>= 1.18',
     'DateTime::Format::ISO8601'     => 0,
+    'File::Touch'                   => 0,
     'Log::Log4perl'                 => '>= 1.42',
     'List::AllUtils'                => '>= 0.09',
     'Linux::Inotify2'               => 0,
