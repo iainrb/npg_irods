@@ -115,8 +115,7 @@ sub publish {
                 $bionano_path, q[': already exists]);
     } else {
         my @stock_records = $self->_query_ml_warehouse();
-        # TODO rename make_collection_metadata which is applied to an object
-        my @bionano_meta = $self->make_collection_metadata(
+        my @bionano_meta = $self->make_publication_metadata(
             $self->resultset,
             @stock_records,
         );
