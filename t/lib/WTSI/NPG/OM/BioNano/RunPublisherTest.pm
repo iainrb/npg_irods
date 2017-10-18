@@ -116,8 +116,6 @@ my $log = Log::Log4perl->get_logger();
 
 
 sub setup_databases : Test(startup) {
-    #$tmp_db = tempdir('temp_bionano_db_XXXXXX', CLEANUP => 1);
-    #my $wh_db_file = catfile($tmp_db, 'ml_wh.db');
     my $db_factory = TestDBFactory->new(
         sqlite_utf8_enabled => 1,
         verbose             => 0
