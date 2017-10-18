@@ -51,16 +51,18 @@ sub construction : Test(10) {
     my $expected_bnx = $data_directory.'/Molecules.bnx';
     is($bnx_path, $expected_bnx, "Found expected filtered molecules path");
 
-    my $bnx_paths = $resultset->bnx_paths;
-    my $expected_bnx_paths = [
+    my @expected_bnx_paths = (
         $data_directory.'/Molecules.bnx',
         $data_directory.'/RawMolecules.bnx',
         $data_directory.'/RawMolecules1.bnx',
         $data_directory.'/RawMolecules2.bnx',
         $data_directory.'/RawMolecules3.bnx',
         $data_directory.'/RawMolecules4.bnx',
-    ];
-    is_deeply($bnx_paths, $expected_bnx_paths, 'Found expected BNX paths');
+    );
+    my @sorted_expected_paths = sort @expected_bnx_paths;
+    my @sorted_result_paths = sort @{$resultset->bnx_paths};
+    is_deeply(\@sorted_result_paths, \@sorted_expected_paths,
+              'Found expected BNX paths');
 
     my $bnx;
     lives_ok(sub { $bnx = $resultset->bnx_file(); },
