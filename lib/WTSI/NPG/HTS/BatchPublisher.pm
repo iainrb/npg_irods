@@ -12,7 +12,7 @@ use Try::Tiny;
 
 use WTSI::DNAP::Utilities::Params qw[function_params];
 use WTSI::NPG::HTS::DefaultDataObjectFactory;
-use WTSI::NPG::iRODS::Publisher;
+use WTSI::NPG::iRODS::PublisherFactory;
 
 with qw[
          WTSI::DNAP::Utilities::Loggable
@@ -111,10 +111,10 @@ sub publish_file_batch {
 
   $extra_avus_callback ||= sub { return };
 
-  my $publisher =
-    WTSI::NPG::iRODS::Publisher->new
-      (irods                  => $self->irods,
-       require_checksum_cache => $self->require_checksum_cache);
+  my $factory = WTSI::NPG::iRODS::PublisherFactory->new();
+  my $publisher = $factory->make_publisher(
+      irods                  => $self->irods,
+      require_checksum_cache => $self->require_checksum_cache);
 
   $self->read_state;
 

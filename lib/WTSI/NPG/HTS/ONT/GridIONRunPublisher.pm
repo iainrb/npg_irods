@@ -28,7 +28,7 @@ use WTSI::NPG::HTS::ONT::TarDataObject;
 use WTSI::NPG::HTS::TarPublisher;
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::Metadata;
-use WTSI::NPG::iRODS::Publisher;
+use WTSI::NPG::iRODS::PublisherFactory;
 use WTSI::NPG::iRODS;
 
 with qw[
@@ -579,9 +579,10 @@ sub _publish_ancillary_files {
   # This is a hack. At this time there is no flag to disable md5 cache
   # files. However, we can limit their creation to files above a
   # certain size and make that size unfeasibly large.
-  my $publisher = WTSI::NPG::iRODS::Publisher->new
-    (checksum_cache_threshold => 1_000_000_000_000,
-     irods                    => $self->irods);
+  my $factory = WTSI::NPG::iRODS::PublisherFactory->new();
+  my $publisher = $factory->make_publisher
+      (checksum_cache_threshold => 1_000_000_000_000,
+       irods                    => $self->irods);
 
   my @files = (@{$self->gridion_run->list_manifest_files},
                @{$self->gridion_run->list_seq_summary_files},

@@ -16,11 +16,8 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::iRODS::Metadata;
-use WTSI::NPG::iRODS::Publisher;
+use WTSI::NPG::iRODS::PublisherFactory;
 use WTSI::NPG::OM::BioNano::ResultSet;
-
-# FIXME Move/refactor WTSI::NPG::HTS::Publisher to reflect use outside of
-# HTS. Maybe consolidate with WTSI::NPG::Publisher in wtsi-npg/genotyping.
 
 our $VERSION = '';
 
@@ -119,7 +116,8 @@ sub publish {
             $self->resultset,
             @stock_records,
         );
-        my $publisher = WTSI::NPG::iRODS::Publisher->new(
+        my $factory = WTSI::NPG::iRODS::PublisherFactory->new();
+        my $publisher = $factory->make_publisher(
             irods => $self->irods,
         );
         my $tmp_archive_path = $self->_write_temporary_archive();
