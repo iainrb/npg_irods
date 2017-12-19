@@ -23,6 +23,7 @@ if (! caller ) {
 }
 sub run {
 
+    my $channel;
     my $collection;
     my $days;
     my $days_ago;
@@ -37,6 +38,7 @@ sub run {
     my $verbose;
 
     GetOptions(
+        'channel=i'                               => \$channel,
         'collection=s'                            => \$collection,
         'days=i'                                  => \$days,
         'days-ago|days_ago=i'                     => \$days_ago,
@@ -100,6 +102,9 @@ sub run {
         }
         if ($enable_rmq) {
             push @init_args, enable_rmq => 1;
+            if (defined $channel) {
+                push @init_args, channel => $channel;
+            }
             if (defined $exchange) {
                 push @init_args, exchange => $exchange;
             }
@@ -145,21 +150,22 @@ npg_publish_bionano_run
 
 Options:
 
+  --channel            A RabbitMQ channel number.
+                       Optional; has no effect unless RabbitMQ is enabled.
   --days-ago
   --days_ago           The number of days ago that the publication window
                        ends. Optional, defaults to zero (the current day).
                        Has no effect if the --runfolder_path option is used.
-
   --days               The number of days in the publication window, ending
                        at the day given by the --days-ago argument. Any
                        sample data modified during this period will be
                        considered for publication. Optional, defaults to 7
                        days. Has no effect if the --runfolder_path option
                        is used.
-   --collection        The data destination root collection in iRODS.
-   --enable-rmq
-   --enable_rmq        Enable RabbitMQ messaging for file publication.
-   --exchange          Name of a RabbitMQ exchange.
+  --collection         The data destination root collection in iRODS.
+  --enable-rmq
+  --enable_rmq         Enable RabbitMQ messaging for file publication.
+  --exchange           Name of a RabbitMQ exchange.
                        Optional; has no effect unless RabbitMQ is enabled.
   --help               Display help.
 
@@ -168,7 +174,6 @@ Options:
   --output_dir         Directory for .tar.gz output. Optional; if not given,
                        .tar.gz file will be written to a temporary directory
                        and deleted on script exit.
-
   --routing-key-prefix
   --routing_key_prefix Prefix for a RabbitMQ routing key.
                        Optional; has no effect unless RabbitMQ is enabled.

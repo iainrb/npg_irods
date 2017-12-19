@@ -45,6 +45,7 @@ my $alignment = 1;
 my $alt_process;
 my $ancillary = 1;
 my $archive_path;
+my $channel;
 my $collection;
 my $debug;
 my $driver_type;
@@ -70,6 +71,7 @@ GetOptions('alignment!'                              => \$alignment,
            'alt-process|alt_process=s'               => \$alt_process,
            'ancillary!'                              => \$ancillary,
            'archive-path|archive_path=s'             => \$archive_path,
+           'channel=i'                               => \$channel,
            'collection=s'                            => \$collection,
            'debug'                                   => \$debug,
            'enable-rmq|enable_rmq'                   => \$enable_rmq,
@@ -164,6 +166,9 @@ if ($max_errors) {
 }
 if ($enable_rmq) {
     push @pub_init_args, enable_rmq => 1;
+    if (defined $channel) {
+        push @init_args, channel => $channel;
+    }
     if (defined $exchange) {
         push @pub_init_args, exchange => $exchange;
     }
@@ -235,10 +240,11 @@ npg_publish_illumina_run
 
 =head1 SYNOPSIS
 
-npg_publish_illumina_run --runfolder-path <path> [--collection <path>]
+npg_publish_illumina_run --runfolder-path <path> [--channel <n>]
+  [--collection <path>] [--enable_rmq] [--exchange <name>]
   [--file-format <format>] [--force] [--position <n>]*
   [--alignment] [--index] [--ancillary] [--qc] [--max-errors <n>]
-  [--debug] [--verbose] [--logconf <path>]
+  [--debug] [--verbose] [--logconf <path>] [--routing_key_prefix <prefix>]
 
  Options:
    --alignment       Load alignment files. Optional, defaults to true.
@@ -292,6 +298,9 @@ npg_publish_illumina_run --runfolder-path <path> [--collection <path>]
                  types may be used e.g. 'samplesheet'.
 
  RabbitMQ options:
+
+   --channel            A RabbitMQ channel number.
+                        Optional; has no effect unless RabbitMQ is enabled.
    --enable-rmq
    --enable_rmq         Enable RabbitMQ messaging for file publication.
    --exchange           Name of a RabbitMQ exchange.
@@ -358,7 +367,7 @@ extra leaf collection is not added.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 

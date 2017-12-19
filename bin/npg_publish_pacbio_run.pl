@@ -38,6 +38,7 @@ log4perl.oneMessagePerAppender = 1
 LOGCONF
 ;
 
+my $channel;
 my $collection;
 my $debug;
 my $enable_rmq;
@@ -49,7 +50,8 @@ my $runfolder_path;
 my $verbose;
 my $sequel;
 
-GetOptions('collection=s'                            => \$collection,
+GetOptions('channel=i'                               => \$channel,
+           'collection=s'                            => \$collection,
            'debug'                                   => \$debug,
            'enable-rmq|enable_rmq'                   => \$enable_rmq,
            'exchange=s'                              => \$exchange,
@@ -105,6 +107,9 @@ if ($collection) {
 }
 if ($enable_rmq) {
     push @init_args, enable_rmq => 1;
+    if (defined $channel) {
+        push @init_args, channel => $channel;
+    }
     if (defined $exchange) {
         push @init_args, exchange => $exchange;
     }
@@ -149,6 +154,8 @@ npg_publish_pacbio_run --runfolder-path <path> [--collection <path>]
   [--force] [--debug] [--verbose] [--logconf <path>] [--sequel]
 
  Options:
+   --channel            A RabbitMQ channel number.
+                        Optional; has no effect unless RabbitMQ is enabled.
    --collection         The destination collection in iRODS. Optional,
                         defaults to /seq/pacbio/.
    --debug              Enable debug level logging. Optional, defaults to
@@ -199,7 +206,7 @@ file, for all available SMRT cells.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 

@@ -28,6 +28,7 @@ use WTSI::NPG::HTS::ONT::TarDataObject;
 use WTSI::NPG::HTS::TarPublisher;
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::Metadata;
+use WTSI::NPG::iRODS::Publisher;
 use WTSI::NPG::iRODS;
 
 with qw[
@@ -35,7 +36,6 @@ with qw[
          WTSI::NPG::Accountable
          WTSI::NPG::iRODS::Annotator
          WTSI::NPG::iRODS::Utilities
-         WTSI::NPG::iRODS::PublisherFactory
          WTSI::NPG::HTS::ArchiveSession
          WTSI::NPG::HTS::ONT::Annotator
          WTSI::NPG::HTS::ONT::Watcher
@@ -579,7 +579,7 @@ sub _publish_ancillary_files {
   # This is a hack. At this time there is no flag to disable md5 cache
   # files. However, we can limit their creation to files above a
   # certain size and make that size unfeasibly large.
-  my $publisher = $self->make_publisher
+  my $publisher = WTSI::NPG::iRODS::Publisher->new
     (checksum_cache_threshold => 1_000_000_000_000,
      irods                    => $self->irods);
 

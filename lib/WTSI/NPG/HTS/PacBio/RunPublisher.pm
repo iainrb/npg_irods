@@ -22,7 +22,7 @@ with qw[
          WTSI::NPG::HTS::PathLister
          WTSI::NPG::HTS::PacBio::Annotator
          WTSI::NPG::HTS::PacBio::MetaQuery
-         WTSI::NPG::iRODS::PublisherFactory
+         WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
        ];
 
 our $VERSION = '';
@@ -536,6 +536,7 @@ sub _build_batch_publisher {
      obj_factory            => $self->obj_factory,
      state_file             => $self->restart_file,
      enable_rmq             => $self->enable_rmq,
+     channel                => $self->channel,
      exchange               => $self->exchange,
      routing_key_prefix     => $self->routing_key_prefix,
      require_checksum_cache => []); ## no md5s precreated for PacBio

@@ -15,6 +15,7 @@ use WTSI::NPG::iRODS;
 
 our $VERSION = '';
 
+my $channel;
 my $collection;
 my $debug;
 my $enable_rmq;
@@ -26,7 +27,8 @@ my $runfolder_path;
 
 my $verbose;
 
-GetOptions('collection=s'                            => \$collection,
+GetOptions('channel=i'                               => \$channel,
+           'collection=s'                            => \$collection,
            'debug'                                   => \$debug,
            'enable-rmq|enable_rmq'                   => \$enable_rmq,
            'exchange=s'                              => \$exchange,
@@ -65,6 +67,9 @@ if (defined $id_run) {
 }
 if ($enable_rmq) {
     push @init_args, enable_rmq => 1;
+    if (defined $channel) {
+        push @init_args, channel => $channel;
+    }
     if (defined $exchange) {
         push @init_args, exchange => $exchange;
     }
@@ -94,6 +99,8 @@ npg_publish_illumina_logs --runfolder-path <path> [--collection <path>]
   [--id-run <id_run>] [--debug] [--verbose] [--logconf <path>]
 
  Options:
+   --channel            A RabbitMQ channel number.
+                        Optional; has no effect unless RabbitMQ is enabled.
    --collection         The destination collection in iRODS. Optional,
                         defaults to /seq/<id_run>/log.
    --debug              Enable debug level logging. Optional, defaults to
@@ -118,11 +125,11 @@ sequencing run into iRODS.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
