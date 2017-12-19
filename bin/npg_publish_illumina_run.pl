@@ -167,7 +167,7 @@ if ($max_errors) {
 if ($enable_rmq) {
     push @pub_init_args, enable_rmq => 1;
     if (defined $channel) {
-        push @init_args, channel => $channel;
+        push @pub_init_args, channel => $channel;
     }
     if (defined $exchange) {
         push @pub_init_args, exchange => $exchange;
