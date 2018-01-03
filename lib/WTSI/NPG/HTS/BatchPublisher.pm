@@ -18,6 +18,7 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::DNAP::Utilities::JSONCodec
          WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
+         WTSI::NPG::iRODS::Reportable::PublisherMQ
        ];
 
 our $VERSION = '';
@@ -154,45 +155,18 @@ sub publish_file_batch {
 
     try {
       $num_processed++;
-      my ($filename, $directories, $suffix) = fileparse($file);
-      my $path = catfile($dest_coll, $filename);
-      my $obj = $self->obj_factory->make_data_object($path);
-      if (not $obj) {
-        $self->logconfess("Failed to parse and make an object from '$path'");
-      }
-
-      $dest = $publisher->publish($file, $obj->str)->str;
-
-      my @primary_avus = $primary_avus_callback->($obj);
-      my ($num_pattr, $num_pproc, $num_perr) =
-        $obj->set_primary_metadata(@primary_avus);
-
-      my @secondary_avus = $secondary_avus_callback->($obj);
-      my ($num_sattr, $num_sproc, $num_serr) =
-        $obj->update_secondary_metadata(@secondary_avus);
-
-      my @extra_avus = $extra_avus_callback->($obj);
-      my ($num_xattr, $num_xproc, $num_xerr) =
-        $self->_add_extra_metadata($obj, @extra_avus);
-
-      # Test metadata at the end
-      if ($num_perr > 0) {
-        $self->logcroak("Failed to set primary metadata cleanly on '$dest'");
-      }
-      if ($num_serr > 0) {
-        $self->logcroak("Failed to set secondary metadata cleanly on '$dest'");
-      }
-      if ($num_xerr > 0) {
-        $self->logcroak("Failed to set extra metadata cleanly on '$dest'");
-      }
-
+      $dest = $self->publish_file_single($file,
+                                         $dest_coll,
+                                         $primary_avus_callback,
+                                         $secondary_avus_callback,
+                                         $extra_avus_callback,
+                                         $publisher)->str();
       $self->state->{$file} = 1; # Mark as published
-
       $self->info("Published '$dest' [$num_processed / $num_files]");
     } catch {
       $num_errors++;
       my @stack = split /\n/msx;  # Chop up the stack trace
-      $self->error("Failed to publish '$file' to '$dest' cleanly ",
+      $self->error("Failed to publish '$file' to '$dest_coll' cleanly ",
                    "[$num_processed / $num_files]: ", pop @stack);
     };
   }
@@ -206,6 +180,72 @@ sub publish_file_batch {
 
   return ($num_files, $num_processed, $num_errors);
 }
+
+
+=head2 publish_file_single
+
+  Arg [1]    : File path, Str.
+  Arg [2]    : iRODS destination collection, Str.
+  Arg [3]    : Callback returning primary AVUs for a data object. CodeRef.
+  Arg [4]    : Callback returning secondary AVUs for a data object.CodeRef.
+  Arg [5]    : Callback returning extra AVUs for a data object. CodeRef,
+               Optional.
+  Arg [6]    : An iRODS Publisher object, as returned by
+               WTSI::NPG::iRODS::PublisherFactory
+
+
+  Example    : $pub->publish_file_single('x.txt',
+                                        '/destination/collection',
+                                        sub { ... },
+                                        sub { ... });
+
+  Description: Publish the given file to iRODS, using callbacks to
+               calculate the metadata to be applied to each file. Return the
+               published DataObject on success.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
+
+sub publish_file_single {
+
+  my ($self, $file, $dest_coll, $primary_avus_callback,
+      $secondary_avus_callback, $extra_avus_callback, $publisher) = @_;
+
+  my ($filename, $directories, $suffix) = fileparse($file);
+  my $path = catfile($dest_coll, $filename);
+  my $obj = $self->obj_factory->make_data_object($path);
+  if (not $obj) {
+      $self->logconfess("Failed to parse and make an object from '$path'");
+  }
+  my $published_obj = $publisher->publish($file, $obj->str);
+  my $dest = $published_obj->str();
+
+  my @primary_avus = $primary_avus_callback->($published_obj);
+  my ($num_pattr, $num_pproc, $num_perr) =
+      $obj->set_primary_metadata(@primary_avus);
+
+  my @secondary_avus = $secondary_avus_callback->($published_obj);
+  my ($num_sattr, $num_sproc, $num_serr) =
+      $obj->update_secondary_metadata(@secondary_avus);
+
+  my @extra_avus = $extra_avus_callback->($published_obj);
+  my ($num_xattr, $num_xproc, $num_xerr) =
+      $self->_add_extra_metadata($published_obj, @extra_avus);
+
+  # Test metadata at the end
+  if ($num_perr > 0) {
+      $self->logcroak("Failed to set primary metadata cleanly on '$dest'");
+  }
+  if ($num_serr > 0) {
+      $self->logcroak("Failed to set secondary metadata cleanly on '$dest'");
+  }
+  if ($num_xerr > 0) {
+      $self->logcroak("Failed to set extra metadata cleanly on '$dest'");
+  }
+
+  return $published_obj;
+}
+
 ## use critic
 
 sub read_state {
