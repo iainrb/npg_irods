@@ -228,17 +228,17 @@ sub publish {
   my $published_obj = $publisher->publish($file, $obj->str);
   my $dest = $published_obj->str();
 
-  my @primary_avus = $primary_avus_callback->($published_obj);
+  my @primary_avus = $primary_avus_callback->($obj);
   my ($num_pattr, $num_pproc, $num_perr) =
       $obj->set_primary_metadata(@primary_avus);
 
-  my @secondary_avus = $secondary_avus_callback->($published_obj);
+  my @secondary_avus = $secondary_avus_callback->($obj);
   my ($num_sattr, $num_sproc, $num_serr) =
       $obj->update_secondary_metadata(@secondary_avus);
 
-  my @extra_avus = $extra_avus_callback->($published_obj);
+  my @extra_avus = $extra_avus_callback->($obj);
   my ($num_xattr, $num_xproc, $num_xerr) =
-      $self->_add_extra_metadata($published_obj, @extra_avus);
+      $self->_add_extra_metadata($obj, @extra_avus);
 
   # Test metadata at the end
   if ($num_perr > 0) {
@@ -251,7 +251,11 @@ sub publish {
       $self->logcroak("Failed to set extra metadata cleanly on '$dest'");
   }
 
-  return $published_obj;
+  # Return the DataObject produced by the factory, not the one returned by
+  # the publisher, because the former may be a specialized subclass such as
+  # WTSI::NPG::HTS::Illumina::AlnDataObject.
+
+  return $obj;
 }
 
 ## use critic
