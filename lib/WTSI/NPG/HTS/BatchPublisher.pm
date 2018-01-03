@@ -18,7 +18,6 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::DNAP::Utilities::JSONCodec
          WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
-         WTSI::NPG::iRODS::Reportable::PublisherMQ
        ];
 
 our $VERSION = '';
@@ -84,6 +83,10 @@ has 'require_checksum_cache' =>
    default       => sub { return [qw[bam cram]] },
    documentation => 'A list of file suffixes for which MD5 cache files ' .
                     'must be provided and will not be created on the fly');
+
+# consume Role after defining attributes, so required methods are present
+
+with 'WTSI::NPG::iRODS::Reportable::PublisherMQ';
 
 =head2 publish_file_batch
 
