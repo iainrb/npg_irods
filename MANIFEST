@@ -34,6 +34,8 @@ lib/WTSI/NPG/HTS/AlFilter.pm
 lib/WTSI/NPG/HTS/ArchiveSession.pm
 lib/WTSI/NPG/HTS/AVUCollator.pm
 lib/WTSI/NPG/HTS/BatchPublisher.pm
+lib/WTSI/NPG/HTS/BatchPublisherFactory.pm
+lib/WTSI/NPG/HTS/BatchPublisherWithReporting.pm
 lib/WTSI/NPG/HTS/DataObject.pm
 lib/WTSI/NPG/HTS/DataObjectFactory.pm
 lib/WTSI/NPG/HTS/DefaultDataObjectFactory.pm

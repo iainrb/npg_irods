@@ -11,7 +11,7 @@ use MooseX::StrictConstructor;
 use Try::Tiny;
 
 use WTSI::DNAP::Utilities::Params qw[function_params];
-use WTSI::NPG::HTS::BatchPublisher;
+use WTSI::NPG::HTS::BatchPublisherFactory;
 use WTSI::NPG::HTS::Illumina::DataObjectFactory;
 use WTSI::NPG::HTS::LIMSFactory;
 use WTSI::NPG::HTS::Seqchksum;
@@ -1392,17 +1392,16 @@ sub _build_batch_publisher {
   my @init_args = (force              => $self->force,
                    irods              => $self->irods,
                    obj_factory        => $self->obj_factory,
-                   state_file         => $self->restart_file,
+                   restart_file       => $self->restart_file,
                    enable_rmq         => $self->enable_rmq,
                    channel            => $self->channel,
                    exchange           => $self->exchange,
-                   routing_key_prefix => $self->routing_key_prefix,
-               );
+                   routing_key_prefix => $self->routing_key_prefix);
   if ($self->has_max_errors) {
     push @init_args, max_errors => $self->max_errors;
   }
-
-  return WTSI::NPG::HTS::BatchPublisher->new(@init_args);
+  my $factory = WTSI::NPG::HTS::BatchPublisherFactory->new(@init_args);
+  return $factory->make_batch_publisher();
 }
 
 sub _build_restart_file {
