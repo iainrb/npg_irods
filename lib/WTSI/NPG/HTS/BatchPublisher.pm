@@ -155,12 +155,12 @@ sub publish_file_batch {
 
     try {
       $num_processed++;
-      $dest = $self->publish_file_single($file,
-                                         $dest_coll,
-                                         $primary_avus_callback,
-                                         $secondary_avus_callback,
-                                         $extra_avus_callback,
-                                         $publisher)->str();
+      $dest = $self->publish($file,
+                             $dest_coll,
+                             $primary_avus_callback,
+                             $secondary_avus_callback,
+                             $extra_avus_callback,
+                             $publisher)->str();
       $self->state->{$file} = 1; # Mark as published
       $self->info("Published '$dest' [$num_processed / $num_files]");
     } catch {
@@ -182,7 +182,7 @@ sub publish_file_batch {
 }
 
 
-=head2 publish_file_single
+=head2 publish
 
   Arg [1]    : File path, Str.
   Arg [2]    : iRODS destination collection, Str.
@@ -194,10 +194,10 @@ sub publish_file_batch {
                WTSI::NPG::iRODS::PublisherFactory
 
 
-  Example    : $pub->publish_file_single('x.txt',
-                                        '/destination/collection',
-                                        sub { ... },
-                                        sub { ... });
+  Example    : $pub->publish('x.txt',
+                             '/destination/collection',
+                             sub { ... },
+                             sub { ... });
 
   Description: Publish the given file to iRODS, using callbacks to
                calculate the metadata to be applied to each file. Return the
@@ -206,7 +206,12 @@ sub publish_file_batch {
 
 =cut
 
-sub publish_file_single {
+sub publish {
+
+  # Method has been named 'publish' to allow the PublisherMQ role to be
+  # consumed. Adding additional method names to the list in PublisherMQ
+  # is problematic -- because the list defines method modifiers, and all
+  # consuming classes must implement all the methods on the list.
 
   my ($self, $file, $dest_coll, $primary_avus_callback,
       $secondary_avus_callback, $extra_avus_callback, $publisher) = @_;
