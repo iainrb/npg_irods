@@ -6,6 +6,7 @@ use Log::Log4perl;
 
 use Test::More;
 use Test::Exception;
+use WTSI::NPG::iRODS;
 
 use base qw[WTSI::NPG::HTS::TestRabbitMQ];
 
