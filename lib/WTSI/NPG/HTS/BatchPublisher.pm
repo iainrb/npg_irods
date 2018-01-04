@@ -207,10 +207,11 @@ sub publish_file_batch {
 
 sub publish {
 
-  # Method has been named 'publish' to allow the PublisherMQ role to be
-  # consumed. Adding additional method names to the list in PublisherMQ
-  # is problematic -- because the list defines method modifiers, and all
-  # consuming classes must implement all the methods on the list.
+  # Method is named 'publish' to enable the method modifier in the
+  # WTSI::NPG::PublisherMQ Role (from perl-irods-wrap). Using a different
+  # method name would be problematic -- because if a Role defines method
+  # modifiers, all consuming classes must implement all the method names
+  # being modified.
 
   my ($self, $file, $dest_coll, $primary_avus_callback,
       $secondary_avus_callback, $extra_avus_callback, $publisher) = @_;
@@ -221,8 +222,13 @@ sub publish {
   if (not $obj) {
       $self->logconfess("Failed to parse and make an object from '$path'");
   }
-  my $published_obj = $publisher->publish($file, $obj->str);
-  my $dest = $published_obj->str();
+  my $dest = $obj->str();
+  $publisher->publish($file, $dest) ||
+    $self->logcroak("Failed to publish '$file' to '$dest'");
+
+  # Use the DataObject produced by the factory, not the one returned by
+  # the publisher, because the former may be a specialized subclass such as
+  # WTSI::NPG::HTS::Illumina::AlnDataObject.
 
   my @primary_avus = $primary_avus_callback->($obj);
   my ($num_pattr, $num_pproc, $num_perr) =
@@ -247,9 +253,6 @@ sub publish {
       $self->logcroak("Failed to set extra metadata cleanly on '$dest'");
   }
 
-  # Return the DataObject produced by the factory, not the one returned by
-  # the publisher, because the former may be a specialized subclass such as
-  # WTSI::NPG::HTS::Illumina::AlnDataObject.
 
   return $obj;
 }
