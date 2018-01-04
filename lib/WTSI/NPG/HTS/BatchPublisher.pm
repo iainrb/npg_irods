@@ -84,6 +84,10 @@ has 'require_checksum_cache' =>
    documentation => 'A list of file suffixes for which MD5 cache files ' .
                     'must be provided and will not be created on the fly');
 
+# consume Role after defining attributes, so required methods are present
+
+with 'WTSI::NPG::iRODS::Reportable::PublisherMQ';
+
 =head2 publish_file_batch
 
   Arg [1]    : File batch, ArrayRef[Str].
