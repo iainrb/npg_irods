@@ -42,3 +42,6 @@ sub runtests {
     }
     return $self->SUPER::runtests;
 }
+
+
+1;
