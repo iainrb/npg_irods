@@ -2,6 +2,7 @@ package WTSI::NPG::HTS::BatchPublisherFactoryTest;
 
 use strict;
 use warnings;
+use File::Temp qw[tempdir];
 use Log::Log4perl;
 
 use Test::More;
@@ -27,9 +28,12 @@ sub make_publishers : Test(6) {
     my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
                                       strict_baton_version => 0);
 
+    my $tmp = tempdir('BatchPublisherFactoryTest_temp_XXXXXX');
+
     my $factory0 = WTSI::NPG::HTS::BatchPublisherFactory->new(
         enable_rmq         => 0,
         irods              => $irods,
+        restart_file       => "$tmp/restart.json",
     );
     my $publisher0 = $factory0->make_batch_publisher();
     isa_ok($publisher0, 'WTSI::NPG::HTS::BatchPublisher');
@@ -43,6 +47,7 @@ sub make_publishers : Test(6) {
         exchange           => 'foo',
         irods              => $irods,
         routing_key_prefix => 'bar',
+        restart_file       => "$tmp/restart.json",
     );
     my $publisher1 = $factory1->make_batch_publisher();
     isa_ok($publisher1, 'WTSI::NPG::iRODS::BatchPublisherWithReporting');

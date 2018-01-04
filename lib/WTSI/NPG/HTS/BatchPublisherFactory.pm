@@ -54,8 +54,6 @@ has 'restart_file' =>
   (isa           => 'Str',
    is            => 'ro',
    required      => 1,
-   lazy          => 1,
-   builder       => '_build_restart_file',
    documentation => 'A file containing a record of files successfully ' .
                     'published');
 
@@ -104,6 +102,12 @@ sub make_batch_publisher {
         $batch_pub = WTSI::NPG::HTS::BatchPublisher->new(@args);
     }
     return $batch_pub;
+}
+
+sub _build_obj_factory {
+  my ($self) = @_;
+
+  return WTSI::NPG::HTS::DefaultDataObjectFactory->new(irods => $self->irods);
 }
 
 
