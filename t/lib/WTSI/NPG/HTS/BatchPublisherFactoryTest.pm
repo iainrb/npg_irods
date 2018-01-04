@@ -7,6 +7,7 @@ use Log::Log4perl;
 use Test::More;
 use Test::Exception;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::BatchPublisherFactory;
 
 use base qw[WTSI::NPG::HTS::TestRabbitMQ];
 
