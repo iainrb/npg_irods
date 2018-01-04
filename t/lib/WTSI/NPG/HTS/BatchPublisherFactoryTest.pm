@@ -27,7 +27,7 @@ sub make_publishers : Test(6) {
     my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
                                       strict_baton_version => 0);
 
-    my $factory0 = WTSI::NPG::iRODS::BatchPublisherFactory->new(
+    my $factory0 = WTSI::NPG::HTS::BatchPublisherFactory->new(
         enable_rmq         => 0,
         irods              => $irods,
     );
@@ -37,7 +37,7 @@ sub make_publishers : Test(6) {
     ok(!($publisher0->isa('WTSI::NPG::HTS::BatchPublisherWithReporting')),
        'Factory does not return a BatchPublisherWithReporting');
 
-    my $factory1 = WTSI::NPG::iRODS::BatchPublisherFactory->new(
+    my $factory1 = WTSI::NPG::HTS::BatchPublisherFactory->new(
         channel            => 42,
         enable_rmq         => 1,
         exchange           => 'foo',
