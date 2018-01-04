@@ -35,7 +35,7 @@ sub runtests {
         $skip_msg = 'TEST_RABBITMQ environment variable is false';
     }
     if (! $run_tests) {
-        diag('Setting enable_rmq parameter to False: Either TEST_RABBITMQ ',
+        diag('Omitting test class: Either TEST_RABBITMQ ',
              'is set to false; or TEST_RABBITMQ is not set, and TEST_AUTHOR ',
              'is false or not set');
         $self->SKIP_CLASS($skip_msg);
