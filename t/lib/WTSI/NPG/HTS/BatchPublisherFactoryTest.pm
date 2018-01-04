@@ -31,7 +31,7 @@ sub make_publishers : Test(6) {
         enable_rmq         => 0,
         irods              => $irods,
     );
-    my $publisher0 = $factory0->make_publisher();
+    my $publisher0 = $factory0->make_batch_publisher();
     isa_ok($publisher0, 'WTSI::NPG::HTS::BatchPublisher');
     # ensure we have an instance of the parent class, not the subclass
     ok(!($publisher0->isa('WTSI::NPG::HTS::BatchPublisherWithReporting')),
@@ -44,7 +44,7 @@ sub make_publishers : Test(6) {
         irods              => $irods,
         routing_key_prefix => 'bar',
     );
-    my $publisher1 = $factory1->make_publisher();
+    my $publisher1 = $factory1->make_batch_publisher();
     isa_ok($publisher1, 'WTSI::NPG::iRODS::BatchPublisherWithReporting');
     is($publisher1->channel, 42, 'channel attribute is correct');
     is($publisher1->exchange, 'foo', 'exchange attribute is correct');
