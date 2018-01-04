@@ -50,7 +50,7 @@ sub make_publishers : Test(6) {
         restart_file       => "$tmp/restart.json",
     );
     my $publisher1 = $factory1->make_batch_publisher();
-    isa_ok($publisher1, 'WTSI::NPG::iRODS::BatchPublisherWithReporting');
+    isa_ok($publisher1, 'WTSI::NPG::HTS::BatchPublisherWithReporting');
     is($publisher1->channel, 42, 'channel attribute is correct');
     is($publisher1->exchange, 'foo', 'exchange attribute is correct');
     is($publisher1->routing_key_prefix, 'bar',
