@@ -11,7 +11,7 @@ use File::Temp;
 use Log::Log4perl;
 use Test::More;
 
-use base qw[WTSI::NPG::HTS::TestRabbitMQ];
+use base qw[WTSI::NPG::HTS::Test];
 
 use WTSI::NPG::HTS::Illumina::AlnDataObject;
 use WTSI::NPG::HTS::Illumina::AncDataObject;
@@ -33,11 +33,6 @@ my $test_counter = 0;
 my $data_path    = 't/data/run_publisher';
 my $fixture_path = "t/fixtures";
 my $db_dir       = File::Temp->newdir;
-my $enable_rmq   = 0;
-
-# Set $enable_rmq to False. Ensures tests will pass if RabbitMQ
-# prerequisites are not available. May add a switch to enable RMQ at a
-# later date, cf. TEST_RABBITMQ environment variable for perl-irods-wrap.
 
 my $wh_schema;
 my $lims_factory;
@@ -85,8 +80,7 @@ sub positions : Test(2) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     is_deeply([$pub->positions], [1 .. 8],
               "Found expected positions ($file_format)")
@@ -118,8 +112,7 @@ sub num_reads : Test(102) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $lane_runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $lane_runfolder_path);
 
     foreach my $lane_position (1 .. 8) {
       my $expected = $lane_expected_read_counts->[$lane_position - 1];
@@ -144,8 +137,7 @@ sub num_reads : Test(102) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $lane_runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $lane_runfolder_path);
 
     foreach my $lane_position (1 .. 8) {
       my $expected = $lane_phix_expected_read_counts->[$lane_position - 1];
@@ -176,8 +168,7 @@ sub num_reads : Test(102) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $plex_runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $plex_runfolder_path);
 
     my @tags = (0 .. $tag_count, 888);
 
@@ -208,8 +199,7 @@ sub num_reads : Test(102) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $plex_runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $plex_runfolder_path);
 
     my @tags = (0 .. $tag_count);
 
@@ -242,8 +232,7 @@ sub is_paired_read : Test(2) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     ok($pub->is_paired_read, "$runfolder_path is paired read");
   }
@@ -262,8 +251,7 @@ sub list_xml_files : Test(2) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my @expected_files = ("$runfolder_path/RunInfo.xml",
                           "$runfolder_path/runParameters.xml");
@@ -288,8 +276,7 @@ sub list_lane_alignment_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_lane_alignment_files($archive_path, $file_format);
 
@@ -317,8 +304,7 @@ sub list_plex_alignment_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index =
       calc_plex_alignment_files($archive_path, $file_format);
@@ -348,8 +334,7 @@ sub list_lane_index_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_lane_index_files($archive_path, $file_format);
 
@@ -377,8 +362,7 @@ sub list_plex_index_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index =
       calc_plex_index_files($archive_path, $file_format);
@@ -408,8 +392,7 @@ sub list_lane_qc_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_lane_qc_files($archive_path, $file_format);
 
@@ -438,8 +421,7 @@ sub list_plex_qc_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_plex_qc_files($archive_path);
 
@@ -467,8 +449,7 @@ sub list_lane_ancillary_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_lane_ancillary_files($archive_path, $file_format);
 
@@ -497,8 +478,7 @@ sub list_plex_ancillary_files : Test(16) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
 
     my %position_index = calc_plex_ancillary_files($archive_path);
 
@@ -528,8 +508,7 @@ sub publish_xml_files : Test(15) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my @expected_paths = ("$dest_coll/RunInfo.xml",
                         "$dest_coll/runParameters.xml");
@@ -566,8 +545,7 @@ sub publish_interop_files : Test(45) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
    my @expected_paths = map { "$dest_coll/InterOp/$_" }
      qw[ControlMetricsOut.bin
@@ -666,8 +644,7 @@ sub publish_lane_index_files : Test(99) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my %position_index = calc_lane_index_files($archive_path, $file_format);
 
@@ -728,8 +705,7 @@ sub publish_plex_index_files : Test(271) {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index =
       calc_plex_index_files($archive_path, $file_format);
@@ -786,8 +762,7 @@ sub publish_lane_ancillary_files : Test(864) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my %position_index = calc_lane_ancillary_files($archive_path, $file_format);
 
@@ -839,8 +814,7 @@ sub publish_plex_ancillary_files : Test(2806) {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index = calc_plex_ancillary_files($archive_path);
 
@@ -888,8 +862,7 @@ sub publish_lane_qc_files : Test(744) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my %position_index = calc_lane_qc_files($archive_path, $file_format);
 
@@ -944,8 +917,7 @@ sub publish_plex_qc_files : Test(1662) {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index = calc_plex_qc_files($archive_path);
 
@@ -1001,8 +973,7 @@ sub publish_plex_alignment_files_alt_process : Test(924) {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index =
       calc_plex_alignment_files($archive_path, $file_format);
@@ -1055,8 +1026,7 @@ sub publish_plex_alignment_files_human_split : Test(3) {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my $num_expected = 5;
 
@@ -1099,8 +1069,7 @@ sub publish_with_samplesheet_driver : Test(762) {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index =
       calc_plex_alignment_files($archive_path, $file_format);
@@ -1144,8 +1113,7 @@ sub dest_collection : Test(8) {
       (file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
     is($pub1->dest_collection, '/seq/5174', 'Default dest collection');
 
     my $pub2 = WTSI::NPG::HTS::Illumina::RunPublisher->new
@@ -1153,8 +1121,7 @@ sub dest_collection : Test(8) {
        file_format     => $file_format,
        irods           => $irods,
        lims_factory    => $lims_factory,
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
     is($pub2->dest_collection, '/a/b/c', 'Custom dest collection');
 
     # Alt process 
@@ -1163,8 +1130,7 @@ sub dest_collection : Test(8) {
        file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
     is($pub3->dest_collection, '/seq/5174/x',
        'Default alt_process destination has process appended to collection');
 
@@ -1174,8 +1140,7 @@ sub dest_collection : Test(8) {
        file_format    => $file_format,
        irods          => $irods,
        lims_factory   => $lims_factory,
-       runfolder_path => $runfolder_path,
-       enable_rmq     => $enable_rmq);
+       runfolder_path => $runfolder_path);
     is($pub4->dest_collection, '/a/b/c',
        'Custom alt_process destination uses the provided collection');
   }
@@ -1198,8 +1163,7 @@ sub check_publish_lane_alignment_files {
      irods           => $irods,
      lims_factory    => $lims_factory,
      restart_file    => catfile($tmpdir->dirname, 'published.json'),
-     runfolder_path  => $runfolder_path,
-     enable_rmq      => $enable_rmq);
+     runfolder_path  => $runfolder_path);
 
   my %position_index = calc_lane_alignment_files($archive_path, $file_format);
 
@@ -1284,8 +1248,7 @@ sub check_publish_plex_alignment_files {
        irods           => $irods,
        lims_factory    => $lims_factory,
        restart_file    => catfile($tmpdir->dirname, 'published.json'),
-       runfolder_path  => $runfolder_path,
-       enable_rmq      => $enable_rmq);
+       runfolder_path  => $runfolder_path);
 
     my %position_index =
       calc_plex_alignment_files($archive_path, $file_format);
