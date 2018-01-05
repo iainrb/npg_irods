@@ -79,6 +79,7 @@ sub make_batch_publisher {
     my ($self, ) = @_;
     my @args;
     if ($self->enable_rmq) {
+        push @args, 'enable_rmq'         => 1;
         push @args, 'channel'            => $self->channel;
         push @args, 'exchange'           => $self->exchange;
         push @args, 'routing_key_prefix' => $self->routing_key_prefix;
