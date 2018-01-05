@@ -28,7 +28,8 @@ sub make_publishers : Test(6) {
     my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
                                       strict_baton_version => 0);
 
-    my $tmp = tempdir('BatchPublisherFactoryTest_temp_XXXXXX');
+    my $tmp = tempdir('BatchPublisherFactoryTest_temp_XXXXXX',
+                      CLEANUP => 1);
 
     my $factory0 = WTSI::NPG::HTS::BatchPublisherFactory->new(
         enable_rmq         => 0,
