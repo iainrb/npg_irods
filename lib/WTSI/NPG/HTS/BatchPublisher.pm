@@ -12,7 +12,7 @@ use Try::Tiny;
 
 use WTSI::DNAP::Utilities::Params qw[function_params];
 use WTSI::NPG::HTS::DefaultDataObjectFactory;
-use WTSI::NPG::iRODS::PublisherFactory;
+use WTSI::NPG::iRODS::Publisher;
 
 with qw[
          WTSI::DNAP::Utilities::Loggable
@@ -46,13 +46,15 @@ has 'obj_factory' =>
    builder       => '_build_obj_factory',
    documentation => 'A factory building data objects from files');
 
-has 'pub_factory' =>
-  (isa           => 'WTSI::NPG::iRODS::PublisherFactory',
+has 'publisher' =>
+  (isa           => 'WTSI::NPG::iRODS::Publisher',
    is            => 'ro',
    required      => 1,
    lazy          => 1,
-   builder       => '_build_pub_factory',
-   documentation => 'A factory building iRODS Publisher objects');
+   builder       => '_build_publisher',
+   documentation => 'An iRODS Publisher object. RabbitMQ reporting is '.
+                    'not enabled for the low-level publisher, to avoid '.
+                    'duplication of messages.');
 
 has 'max_errors' =>
   (isa           => 'Int',
@@ -120,8 +122,6 @@ sub publish_file_batch {
 
   $extra_avus_callback ||= sub { return };
 
-  my $publisher = $self->pub_factory->make_publisher();
-
   $self->read_state;
 
   my $num_files     = scalar @{$files};
@@ -158,8 +158,7 @@ sub publish_file_batch {
                              $dest_coll,
                              $primary_avus_callback,
                              $secondary_avus_callback,
-                             $extra_avus_callback,
-                             $publisher)->str();
+                             $extra_avus_callback)->str();
       $self->state->{$file} = 1; # Mark as published
       $self->info("Published '$dest' [$num_processed / $num_files]");
     } catch {
@@ -189,9 +188,6 @@ sub publish_file_batch {
   Arg [4]    : Callback returning secondary AVUs for a data object.CodeRef.
   Arg [5]    : Callback returning extra AVUs for a data object. CodeRef,
                Optional.
-  Arg [6]    : An iRODS Publisher object, as returned by
-               WTSI::NPG::iRODS::PublisherFactory
-
 
   Example    : $pub->publish('x.txt',
                              '/destination/collection',
@@ -214,7 +210,7 @@ sub publish {
   # being modified.
 
   my ($self, $file, $dest_coll, $primary_avus_callback,
-      $secondary_avus_callback, $extra_avus_callback, $publisher) = @_;
+      $secondary_avus_callback, $extra_avus_callback) = @_;
 
   my ($filename, $directories, $suffix) = fileparse($file);
   my $path = catfile($dest_coll, $filename);
@@ -223,11 +219,11 @@ sub publish {
       $self->logconfess("Failed to parse and make an object from '$path'");
   }
   my $dest = $obj->str();
-  $publisher->publish($file, $dest) ||
+  $self->publisher->publish($file, $dest) ||
     $self->logcroak("Failed to publish '$file' to '$dest'");
 
   # Use the DataObject produced by the factory, not the one returned by
-  # the publisher, because the former may be a specialized subclass such as
+  # the Publisher, because the former may be a specialized subclass such as
   # WTSI::NPG::HTS::Illumina::AlnDataObject.
 
   my @primary_avus = $primary_avus_callback->($obj);
@@ -252,7 +248,6 @@ sub publish {
   if ($num_xerr > 0) {
       $self->logcroak("Failed to set extra metadata cleanly on '$dest'");
   }
-
 
   return $obj;
 }
@@ -313,15 +308,11 @@ sub _build_obj_factory {
   return WTSI::NPG::HTS::DefaultDataObjectFactory->new(irods => $self->irods)
 }
 
-sub _build_pub_factory {
+sub _build_publisher {
     my ($self) = @_;
-    return WTSI::NPG::iRODS::PublisherFactory->new(
+    return WTSI::NPG::iRODS::Publisher->new(
         irods                  => $self->irods,
         require_checksum_cache => $self->require_checksum_cache,
-        channel                => $self->channel,
-        exchange               => $self->exchange,
-        routing_key_prefix     => $self->routing_key_prefix,
-        enable_rmq             => $self->enable_rmq,
     );
 }
 
