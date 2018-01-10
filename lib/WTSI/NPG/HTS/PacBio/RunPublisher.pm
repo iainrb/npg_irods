@@ -629,10 +629,11 @@ collection, the following take place:
 
 Guoying Qi E<lt>gq1@sanger.ac.ukE<gt>
 Keith James E<lt>kdj@sanger.ac.ukE<gt>
+Iain Bancarz E<lt>ib5@sanger.ac.ukE<gt>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2011, 2016, 2017 Genome Research Limited. All Rights
+Copyright (C) 2011, 2016, 2017, 2018 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify

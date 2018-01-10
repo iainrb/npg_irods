@@ -53,7 +53,7 @@ has 'publisher' =>
    lazy          => 1,
    builder       => '_build_publisher',
    documentation => 'An iRODS Publisher object. RabbitMQ reporting is '.
-                    'not enabled for the low-level publisher, to avoid '.
+                    'not enabled for this Publisher, to avoid '.
                     'duplication of messages.');
 
 has 'max_errors' =>
@@ -371,7 +371,7 @@ Iain Bancarz E<lt>ib5@sanger.ac.ukE<gt>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2017 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2017, 2018 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
