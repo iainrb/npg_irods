@@ -53,6 +53,9 @@ lib/WTSI/NPG/HTS/Illumina/RunPublisher.pm
 lib/WTSI/NPG/HTS/Illumina/XMLDataObject.pm
 lib/WTSI/NPG/HTS/LIMSFactory.pm
 lib/WTSI/NPG/HTS/Metadata.pm
+lib/WTSI/NPG/HTS/MetaHelper.pm
+lib/WTSI/NPG/HTS/MetaHelperWithReporting.pm
+lib/WTSI/NPG/HTS/MetaHelperFactory.pm
 lib/WTSI/NPG/HTS/ONT/Annotator.pm
 lib/WTSI/NPG/HTS/ONT/GridIONMetaUpdater.pm
 lib/WTSI/NPG/HTS/ONT/GridIONRunMonitor.pm
@@ -15366,6 +15369,7 @@ t/lib/WTSI/NPG/HTS/Illumina/AncDataObjectTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/LogPublisherTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/MetaUpdaterTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/RunPublisherTest.pm
+t/lib/WTSI/NPG/HTS/MetaHelperTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONMetaUpdaterTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONRunMonitorTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONRunPublisherTest.pm
@@ -15385,6 +15389,7 @@ t/lib/WTSI/NPG/OM/BioNano/ResultSetTest.pm
 t/lib/WTSI/NPG/OM/BioNano/RunFinderTest.pm
 t/lib/WTSI/NPG/OM/BioNano/RunPublisherTest.pm
 t/log_publisher.t
+t/meta_helper_factory.t
 t/minion_run_publisher.t
 t/pacbio_apiclient.t
 t/pacbio_meta_updater.t
