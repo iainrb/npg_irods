@@ -15369,7 +15369,7 @@ t/lib/WTSI/NPG/HTS/Illumina/AncDataObjectTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/LogPublisherTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/MetaUpdaterTest.pm
 t/lib/WTSI/NPG/HTS/Illumina/RunPublisherTest.pm
-t/lib/WTSI/NPG/HTS/MetaHelperTest.pm
+t/lib/WTSI/NPG/HTS/MetaHelperFactoryTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONMetaUpdaterTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONRunMonitorTest.pm
 t/lib/WTSI/NPG/HTS/ONT/GridIONRunPublisherTest.pm
