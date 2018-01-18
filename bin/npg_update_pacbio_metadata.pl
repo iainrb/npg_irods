@@ -21,29 +21,38 @@ use WTSI::NPG::iRODS::Metadata qw[$PACBIO_SOURCE $PACBIO_PRODUCTION $PACBIO_CELL
 our $VERSION = '';
 our $DEFAULT_ZONE = 'seq';
 
+my $channel;
 my $debug;
 my $dry_run = 1;
+my $enable_rmq;
+my $exchange;
 my @id_run;
 my $log4perl_config;
 my $max_id_run;
 my $min_id_run;
+my $routing_key_prefix;
 my $stdio;
 my $verbose;
 my $zone;
 my $file_type;
 
-GetOptions('debug'                     => \$debug,
-           'dry-run|dry_run!'          => \$dry_run,
-           'help'                      => sub { pod2usage(-verbose => 2,
-                                                          -exitval => 0) },
-           'logconf=s'                 => \$log4perl_config,
-           'verbose'                   => \$verbose,
-           'max_id_run|max-id-run=i'   => \$max_id_run,
-           'min_id_run|min-id-run=i'   => \$min_id_run,
-           'id_run|id-run=i'           => \@id_run,
-           'zone=s',                   => \$zone,
-           'file_type|file-type=s'     => \$file_type,
-           q[]                         => \$stdio);
+GetOptions('channel=i'                               => \$channel,
+           'debug'                                   => \$debug,
+           'dry-run|dry_run!'                        => \$dry_run,
+           'enable-rmq|enable_rmq'                   => \$enable_rmq,
+           'exchange=s'                              => \$exchange,
+           'file_type|file-type=s'                   => \$file_type,
+           'help'                                    => sub {
+               pod2usage(-verbose => 2, -exitval => 0)
+           },
+           'id_run|id-run=i'                         => \@id_run,
+           'logconf=s'                               => \$log4perl_config,
+           'max_id_run|max-id-run=i'                 => \$max_id_run,
+           'min_id_run|min-id-run=i'                 => \$min_id_run,
+           'routing-key-prefix|routing_key_prefix=s' => \$routing_key_prefix,
+           'verbose'                                 => \$verbose,
+           'zone=s',                                 => \$zone,
+           q[]                                       => \$stdio);
 
 if ($log4perl_config) {
   Log::Log4perl::init($log4perl_config);
@@ -127,9 +136,23 @@ my $num_updated = 0;
 if (@data_objs) {
   my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
 
-  $num_updated = WTSI::NPG::HTS::PacBio::MetaUpdater->new
-    (irods       => $irods,
-     mlwh_schema => $wh_schema)->update_secondary_metadata(\@data_objs);
+  my @updater_init_args = (irods       => $irods,
+                           mlwh_schema => $wh_schema);
+  if ($enable_rmq) {
+    push @updater_init_args, enable_rmq => 1;
+    if (defined $channel) {
+      push @updater_init_args, channel => $channel;
+    }
+    if (defined $exchange) {
+      push @updater_init_args, exchange => $exchange;
+    }
+    if (defined $routing_key_prefix) {
+      push @updater_init_args, routing_key_prefix => $routing_key_prefix;
+    }
+  }
+  $num_updated = WTSI::NPG::HTS::PacBio::MetaUpdater->new(
+      \@updater_init_args
+  )->update_secondary_metadata(\@data_objs);
 }
 
 $log->info("Updated metadata on $num_updated files");
@@ -197,6 +220,19 @@ npg_update_pacbio_metadata [--dry-run] [--logconf file]
   -             Read iRODS paths from STDIN instead of finding them by their
                 run, lane and tag index.
 
+
+ RabbitMQ options:
+
+  --channel            A RabbitMQ channel number.
+                       Optional; has no effect unless RabbitMQ is enabled.
+  --enable-rmq
+  --enable_rmq         Enable RabbitMQ messaging for metadata updates.
+  --exchange           Name of a RabbitMQ exchange.
+                       Optional; has no effect unless RabbitMQ is enabled.
+  --routing-key-prefix
+  --routing_key_prefix Prefix for a RabbitMQ routing key.
+                       Optional; has no effect unless RabbitMQ is enabled.
+
 =head1 DESCRIPTION
 
 This script updates secondary metadata (i.e. LIMS-derived metadata,
@@ -214,11 +250,11 @@ notices to the log.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2018 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

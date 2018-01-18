@@ -14,6 +14,7 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::PacBio::Annotator
          WTSI::NPG::HTS::PacBio::MetaQuery
+         WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
        ];
 
 our $VERSION = '';
@@ -31,6 +32,13 @@ has 'obj_factory' =>
    lazy          => 1,
    builder       => '_build_obj_factory',
    documentation => 'A factory building data objects from files');
+
+has 'helper_factory' =>
+  (is            => 'ro',
+   isa           => 'WTSI::NPG::HTS::MetaHelperFactory',
+   lazy          => 1,
+   builder       => '_build_helper_factory',
+   documentation => 'A factory providing MetaHelper objects');
 
 
 =head2 update_secondary_metadata
@@ -69,8 +77,8 @@ sub update_secondary_metadata {
     try {
       my @run_records = $self->find_pacbio_runs($id_run, $well);
       my @secondary_avus = $self->make_secondary_metadata(@run_records);
-      $obj->update_secondary_metadata(@secondary_avus);
-
+      my $helper = $self->helper_factory->make_meta_helper();
+      $helper->update_object_secondary_metadata($obj, \@secondary_avus);
       $self->info("Updated metadata on '$path' ",
                   "[$num_processed / $num_paths]");
     } catch {
@@ -85,6 +93,17 @@ sub update_secondary_metadata {
   return $num_processed - $num_errors;
 }
 
+sub _build_helper_factory {
+  my ($self) = @_;
+  my @args = (irods => $self->irods);
+  if ($self->enable_rabbitmq) {
+      push @args, channel            => $self->channel;
+      push @args, enable_rabbitmq    => 1;
+      push @args, exchange           => $self->exchange;
+      push @args, routing_key_prefix => $self->routing_key_prefix;
+  }
+  return WTSI::NPG::HTS::MetaHelperFactory->new(@args);
+}
 
 sub _build_obj_factory {
   my ($self) = @_;
@@ -114,11 +133,11 @@ each file are trapped and logged.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2016, 2018 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

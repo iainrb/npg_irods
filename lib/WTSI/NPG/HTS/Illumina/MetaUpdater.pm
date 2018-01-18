@@ -12,6 +12,7 @@ use WTSI::NPG::iRODS;
 with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::Illumina::Annotator
+         WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
        ];
 
 our $VERSION = '';
@@ -34,6 +35,13 @@ has 'lims_factory' =>
    isa           => 'WTSI::NPG::HTS::LIMSFactory',
    required      => 1,
    documentation => 'A factory providing st:api::lims objects');
+
+has 'helper_factory' =>
+  (is            => 'ro',
+   isa           => 'WTSI::NPG::HTS::MetaHelperFactory',
+   lazy          => 1,
+   builder       => '_build_helper_factory',
+   documentation => 'A factory providing MetaHelper objects');
 
 =head2 update_secondary_metadata
 
@@ -71,8 +79,8 @@ sub update_secondary_metadata {
           ($self->lims_factory, $obj->id_run, $obj->position,
            tag_index           => $obj->tag_index,
            with_spiked_control => $with_spiked_control);
-        $obj->update_secondary_metadata(@secondary_avus);
-
+        my $helper = $self->helper_factory->make_meta_helper();
+        $helper->update_object_secondary_metadata($obj, \@secondary_avus);
         $self->info("Updated metadata on '$path' ",
                     "[$num_processed / $num_paths]");
       } catch {
@@ -93,6 +101,18 @@ sub update_secondary_metadata {
   }
 
   return $num_processed - $num_errors;
+}
+
+sub _build_helper_factory {
+  my ($self) = @_;
+  my @args = (irods => $self->irods);
+  if ($self->enable_rabbitmq) {
+      push @args, channel            => $self->channel;
+      push @args, enable_rabbitmq    => 1;
+      push @args, exchange           => $self->exchange;
+      push @args, routing_key_prefix => $self->routing_key_prefix;
+  }
+  return WTSI::NPG::HTS::MetaHelperFactory->new(@args);
 }
 
 sub _build_obj_factory {
@@ -124,11 +144,11 @@ trapped and logged.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2015, 2016 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2015, 2016, 2018 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

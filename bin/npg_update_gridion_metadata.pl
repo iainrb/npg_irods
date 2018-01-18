@@ -19,23 +19,32 @@ use WTSI::NPG::iRODS;
 our $VERSION = '';
 our $DEFAULT_ZONE = 'seq';
 
+my $channel;
 my $debug;
 my $dry_run = 1;
+my $enable_rmq;
+my $exchange;
 my @experiment_name;
 my $log4perl_config;
+my $routing_key_prefix;
 my $stdio;
 my $verbose;
 my $zone;
 
-GetOptions('debug'            => \$debug,
+GetOptions('channel=i'                               => \$channel,
+           'debug'            => \$debug,
            'dry-run|dry_run!' => \$dry_run,
-           'help'             => sub { pod2usage(-verbose => 2,
-                                                 -exitval => 0) },
-           'logconf=s'        => \$log4perl_config,
-           'verbose'          => \$verbose,
-           'experiment-name|experiment_name=s' => \@experiment_name,
-           'zone=s',          => \$zone,
-           q[]                => \$stdio);
+           'enable-rmq|enable_rmq'                   => \$enable_rmq,
+           'exchange=s'                              => \$exchange,
+           'experiment-name|experiment_name=s'       => \@experiment_name,
+           'help'                                    => sub {
+               pod2usage(-verbose => 2, -exitval => 0)
+           },
+           'logconf=s'                               => \$log4perl_config,
+           'routing-key-prefix|routing_key_prefix=s' => \$routing_key_prefix,
+           'verbose'                                 => \$verbose,
+           'zone=s',                                 => \$zone,
+           q[]                                       => \$stdio);
 
 if ($log4perl_config) {
   Log::Log4perl::init($log4perl_config);
@@ -94,9 +103,23 @@ my $num_updated = 0;
 if (@data_objs) {
   my $wh_schema = WTSI::DNAP::Warehouse::Schema->connect;
 
-  $num_updated = WTSI::NPG::HTS::ONT::GridIONMetaUpdater->new
-    (irods       => $irods,
-     mlwh_schema => $wh_schema)->update_secondary_metadata(\@data_objs);
+  my @updater_init_args = (irods       => $irods,
+                           mlwh_schema => $wh_schema);
+  if ($enable_rmq) {
+    push @updater_init_args, enable_rmq => 1;
+    if (defined $channel) {
+      push @updater_init_args, channel => $channel;
+    }
+    if (defined $exchange) {
+      push @updater_init_args, exchange => $exchange;
+    }
+    if (defined $routing_key_prefix) {
+      push @updater_init_args, routing_key_prefix => $routing_key_prefix;
+    }
+  }
+  $num_updated = WTSI::NPG::HTS::ONT::GridIONMetaUpdater->new(
+      \@updater_init_args
+  )->update_secondary_metadata(\@data_objs);
 }
 
 $log->info("Updated metadata on $num_updated files");
@@ -129,6 +152,18 @@ npg_update_gridion_metadata [--dry-run] --experiment-name name
   -                  Read iRODS paths from STDIN instead of finding them
                      by their run, lane and tag index.
 
+ RabbitMQ options:
+
+  --channel            A RabbitMQ channel number.
+                       Optional; has no effect unless RabbitMQ is enabled.
+  --enable-rmq
+  --enable_rmq         Enable RabbitMQ messaging for metadata updates.
+  --exchange           Name of a RabbitMQ exchange.
+                       Optional; has no effect unless RabbitMQ is enabled.
+  --routing-key-prefix
+  --routing_key_prefix Prefix for a RabbitMQ routing key.
+                       Optional; has no effect unless RabbitMQ is enabled.
+
 =head1 DESCRIPTION
 
 This script updates secondary metadata (i.e. LIMS-derived metadata,
@@ -142,11 +177,11 @@ notices to the log.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2017 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2017, 2018 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
