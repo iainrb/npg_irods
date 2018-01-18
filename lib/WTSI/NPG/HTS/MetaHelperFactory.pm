@@ -52,6 +52,8 @@ sub make_meta_helper {
     return $helper;
 }
 
+1;
+
 
 
 __END__
