@@ -14,7 +14,6 @@ with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::ONT::MetaQuery
          WTSI::NPG::HTS::ONT::Annotator
-         WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
        ];
 
 our $VERSION = '';
@@ -39,6 +38,8 @@ has 'helper_factory' =>
    lazy          => 1,
    builder       => '_build_helper_factory',
    documentation => 'A factory providing MetaHelper objects');
+
+with qw[WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ];
 
 sub update_secondary_metadata {
   my ($self, $paths) = @_;
