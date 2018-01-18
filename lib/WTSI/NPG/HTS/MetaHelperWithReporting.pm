@@ -4,7 +4,7 @@ use Moose;
 
 our $VERSION = '';
 
-extends 'WTSI::NPG::iRODS::MetaHelper';
+extends 'WTSI::NPG::HTS::MetaHelper';
 
 with 'WTSI::NPG::iRODS::Reportable::MetaHelperMQ';
 
