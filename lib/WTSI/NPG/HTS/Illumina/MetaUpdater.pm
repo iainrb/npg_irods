@@ -7,11 +7,13 @@ use MooseX::StrictConstructor;
 use Try::Tiny;
 
 use WTSI::NPG::HTS::Illumina::DataObjectFactory;
+use WTSI::NPG::HTS::MetaHelperFactory;
 use WTSI::NPG::iRODS;
 
 with qw[
          WTSI::DNAP::Utilities::Loggable
          WTSI::NPG::HTS::Illumina::Annotator
+         WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ
        ];
 
 our $VERSION = '';
@@ -42,7 +44,7 @@ has 'helper_factory' =>
    builder       => '_build_helper_factory',
    documentation => 'A factory providing MetaHelper objects');
 
-with qw[WTSI::NPG::iRODS::Reportable::ConfigurableForRabbitMQ];
+# FIXME MetaUpdater object doesn't seem to be aware of enable_rabbitmq attribute. Bug in Moose? Try having MetaHelper instead of MetaHelperFactory as attribute?
 
 =head2 update_secondary_metadata
 
